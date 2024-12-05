@@ -1,0 +1,37 @@
+{
+    "name": "crumbls/importer",
+    "description": "A flexible data importing package with support for WordPress and other sources",
+    "type": "library",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0",
+        "nette/php-generator": "^4.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0",
+        "phpunit/phpunit": "^10.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Crumbls\\Importer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Crumbls\\Importer\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Crumbls\\Importer\\ImporterServiceProvider"
+            ],
+
+            "aliases": {
+                "Importer": "Crumbls\\Importer\\Facades\\Importer"
+            }
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
