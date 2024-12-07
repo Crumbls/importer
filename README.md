@@ -2,35 +2,46 @@
 
 A flexible, state-based importer package for Laravel with support for CSV, SQL, WordPress XML, and Eloquent data sources.
 
-This will connect or read the remote datasource, determine the model(s) name(s), create migrations, then create standardized
-data with seeders to handle importing it.
+## This is early beta and should not be used.  
 
-This is early beta and should not be used.  Forks appreciated.
+It is being rewritten today 12-08-2024.
 
-Submit suggestions or requests to importer@crumbls.com
+Forks appreciated, input valued.
+
+1) Verify input
+2) Standardize input 
+3) Make an educated guess on the output
+4) Get approval for output
+5) Process
 
 ## Installation
 
-
+```bash
+composer require crumbls/importer
 ```
 
-// Using the facade
-use Crumbls\Importer\Facades\Importer;
+## Basic Usage
 
-// Get default driver
-$driver = Importer::driver();
+Seriously, don't use this yet.  I'm reworking a few things that I think will make substantial improvements and allow us
+to do more than just WordPress.  
 
-// Get specific driver
-$driver = Importer::driver('wordpress-xml');
+This is what I am running to pull random import xml files from WordPress for tests right now.  Syntax is similar for
+WP connections or sql files ( not yet supported )  
 
-// Register custom driver
-Importer::extend('custom-driver', function ($app) {
-    return new CustomDriver($app['config']['importer.drivers.custom-driver']);
-});
+Right now, I'm throwing hundreds of files I've pulled from the internet at it to test with. Taking a break for breakfast
+and then I'll be back.
+```
+	$file = \Arr::random(glob(base_path('import-tests').'/*.xml'));
+	$import = \Crumbls\Importer\Models\Import::firstOrCreate([
+		'driver' => 'wordpress-xml',
+		'source' => $file,
+		'state' => \Crumbls\Importer\Drivers\WordPressXML\States\ValidateState::class
+	]);
 
-// Or using dependency injection
-public function import(ImportManager $importer)
-{
-    $driver = $importer->driver('wordpress-xml');
-    // Use driver...
-}
+	$driver = $import->getDriver();
+
+	while ($driver->canAdvance()) {
+		$driver->advance();
+	}
+
+```

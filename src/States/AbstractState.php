@@ -2,19 +2,20 @@
 
 namespace Crumbls\Importer\States;
 
-use Crumbls\Importer\Contracts\StateInterface;
-use Crumbls\Importer\Drivers\AbstractDriver;
+use Crumbls\Importer\Contracts\DriverInterface;
+use Illuminate\Database\Eloquent\Model;
 
-abstract class AbstractState implements StateInterface
-{
-	public function __construct(private AbstractDriver &$driver) {
-	}
+abstract class AbstractState {
+	public function __construct(protected DriverInterface $driver) {}
+	abstract public function getName(): string;
+	abstract public function handle(): void;
 
-	public function getDriver() : AbstractDriver {
+
+	public function getDriver() : DriverInterface {
 		return $this->driver;
 	}
 
-	abstract public function execute(): void;
-	abstract public function canTransition(): bool;
-	abstract public function getNextState(): ?string;
+	public function getRecord() : Model {
+		return $this->getDriver()->getRecord() ?? throw new \Exception('Model not found.');
+	}
 }

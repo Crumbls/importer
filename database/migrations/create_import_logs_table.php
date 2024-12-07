@@ -14,10 +14,11 @@ return new class extends Migration
 	{
 		Schema::create($this->getTable(), function (Blueprint $table) {
 			$table->id();
-			$table->foreignId('import_state_id')->constrained()->cascadeOnDelete();
+			$table->foreignId('import_id')->constrained()->cascadeOnDelete();
 			$table->string('level');
-			$table->string('message');
-			$table->json('metadata')->nullable();
+			$table->string('stage')->nullable();
+			$table->text('message');
+			$table->json('context')->nullable();
 			$table->timestamps();
 		});
 	}

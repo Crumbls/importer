@@ -1,5 +1,6 @@
 <?php
 
+
 return [
 	/*
 	|--------------------------------------------------------------------------
@@ -26,8 +27,6 @@ return [
 
 	'drivers' => [
 		'wordpress-xml' => [
-			'batch_size' => 100,
-			'media_path' => storage_path('app/imports/media'),
 		],
 
 		'csv' => [

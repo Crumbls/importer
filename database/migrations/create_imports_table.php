@@ -11,20 +11,23 @@ return new class extends Migration
 	 * @return string
 	 */
 	public function getTable() : string {
-		$modelClass = \Crumbls\Importer\Models\ImportState::class;
+		$modelClass = \Crumbls\Importer\Models\Import::class;
 		return with(new $modelClass())->getTable();
 	}
 	public function up()
 	{
 		Schema::create(static::getTable(), function (Blueprint $table) {
 			$table->id();
-			$table->string('source_type');
-			$table->string('status');
+			$table->string('driver')->nullable();
+			$table->string('source')->nullable();
+			$table->string('state')->nullable();
+//			$table->string('status');
+			$table->json('config')->nullable();
 			$table->json('metadata')->nullable();
-			$table->json('cursor')->nullable();
 			$table->timestamp('started_at')->nullable();
 			$table->timestamp('completed_at')->nullable();
 			$table->timestamps();
+//			$table->softDeletes();
 		});
 	}
 
