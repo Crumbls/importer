@@ -1,55 +1,28 @@
 <?php
 
-namespace Crumbls\Importer\Drivers\WordPressXML;
+namespace Crumbls\Importer\Drivers\WordPressSql;
 
-use Crumbls\Importer\Contracts\ColumnMappingInterface;
 use Crumbls\Importer\Contracts\DriverInterface;
 use Crumbls\Importer\Drivers\AbstractDriver;
-use Crumbls\Importer\Drivers\WordPressXML\States\CompleteState;
-use Crumbls\Importer\Drivers\WordPressXML\States\ConvertToDatabaseState;
-use Crumbls\Importer\Drivers\WordPressXML\States\InitializeState;
-use Crumbls\Importer\Drivers\WordPressXML\States\MapPostTypesState;
-use Crumbls\Importer\Drivers\WordPressXML\States\ValidateState;
-use Crumbls\Importer\Models\Import;
+use Crumbls\Importer\Drivers\WordPressSql\States\CompleteState;
+use Crumbls\Importer\Drivers\WordPressSql\States\ConvertToDatabaseState;
+use Crumbls\Importer\Drivers\WordPressSql\States\DetermineTablePrefixState;
+use Crumbls\Importer\Drivers\WordPressSql\States\InitializeState;
+use Crumbls\Importer\Drivers\WordPressSql\States\MapPostTypesState;
+use Crumbls\Importer\Drivers\WordPressSql\States\ValidateState;
 use Crumbls\Importer\States\CreateFilamentResourcesState;
 use Crumbls\Importer\States\CreateMigrationsState;
 use Crumbls\Importer\States\CreateModelsState;
-use Crumbls\Importer\Traits\HasColumnMapping;
-use Crumbls\Importer\Traits\HasImportConnection;
-use Crumbls\Importer\Traits\HasWordPressColumns;
+use Crumbls\Importer\Traits\HasSqlImporter;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
 
-class WordPressXmlDriver extends AbstractDriver implements DriverInterface, ColumnMappingInterface
+/**
+ * TODO: Not yet implemented.
+ */
+class WordPressSqlDriver extends AbstractDriver implements DriverInterface
 {
-	use HasColumnMapping;
-
-
-	protected function getDefaultColumnMap(): array {
-		return [
-			'ID' => 'id',
-			'post_content' => 'content',
-			'post_title' => 'title',
-			'post_excerpt' => 'excerpt',
-			'post_status' => 'status',
-			'post_name' => 'slug',
-			'post_author' => 'author_id',
-			'post_parent' => 'parent_id',
-			'post_date' => 'created_at',
-			'post_modified' => 'updated_at'
-		];
-	}
-
-	protected function getDefaultTransforms(): array {
-		return [
-			'ID' => 'integer',
-			'post_author' => 'integer',
-			'post_parent' => 'integer',
-			'post_date' => 'datetime',
-			'post_modified' => 'datetime'
-		];
-	}
 
 	public static function getRegisteredStates(): array {
 		return [
@@ -67,8 +40,11 @@ class WordPressXmlDriver extends AbstractDriver implements DriverInterface, Colu
 				ConvertToDatabaseState::class
 			],
 			ConvertToDatabaseState::class => [
+				DetermineTablePrefixState::class
+			],
+			DetermineTablePrefixState::class => [
 				MapPostTypesState::class
-				],
+			],
 			MapPostTypesState::class => [
 				CreateModelsState::class
 			],
@@ -95,7 +71,7 @@ class WordPressXmlDriver extends AbstractDriver implements DriverInterface, Colu
 	 */
 	public static function getName(): string
 	{
-		return 'wordpress-xml';
+		return 'wordpress-sql';
 	}
 
 	protected function configureConnection(): void {

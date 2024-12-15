@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
 
 trait HasImportConnection {
-	protected function getImportConnectionName() : ?string {
+	public function getImportConnectionName() : ?string {
 dd(__LINE__);
 		$record = $this->getRecord();
 		$md = $record->metadata ?? [];

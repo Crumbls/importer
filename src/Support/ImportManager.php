@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\Support;
 
+use Crumbls\Importer\Drivers\WordPressSql\WordPressSqlDriver;
 use Crumbls\Importer\Drivers\WordPressXML\WordPressXmlDriver;
 use Illuminate\Support\Manager;
 use Crumbls\Importer\Contracts\DriverInterface;
@@ -35,6 +36,16 @@ class ImportManager extends Manager
 		return new WordPressXmlDriver($config);
 	}
 
+	/**
+	 * Create a WordPress XML driver instance.
+	 */
+	protected function createWordPressSqlDriver(): WordPressSqlDriver
+	{
+		$config = $this->config->get('importer.drivers.wordpress-sql', []);
+		dump('Creating driver with config:', $config);
+		return new WordPressSqlDriver($config);
+	}
+
 	public function driver($driver = null)
 	{
 		dump('Requested driver:', $driver);
@@ -48,7 +59,8 @@ class ImportManager extends Manager
 	public function getAvailableDrivers(): array
 	{
 		return [
-			WordPressXmlDriver::getName()
+			WordPressXmlDriver::getName(),
+			WordPressSqlDriver::getName()
 		];
 	}
 }

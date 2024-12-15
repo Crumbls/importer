@@ -5,7 +5,9 @@
     "require": {
         "php": "^8.2",
         "illuminate/support": "^11.0",
-        "nette/php-generator": "^4.0"
+        "nette/php-generator": "^4.0",
+        "phpmyadmin/sql-parser": "*",
+        "greenlion/php-sql-parser": "*"
     },
     "require-dev": {
         "orchestra/testbench": "^9.0",
