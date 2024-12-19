@@ -31,6 +31,10 @@ class ConvertToDatabaseState extends AbstractState
 		$this->db = new PDO('sqlite:' . $dbPath);
 		$this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+		/**
+		 * TODO: Rewrite this.  I want to be able to handle any xml down the road.
+		 * We will extend the XML Driver to implement this better.
+		 */
 		$this->createTables();
 		$this->processXML($record->source);
 	}

@@ -2,19 +2,18 @@
 
 namespace Crumbls\Importer\Drivers\WordPressSql\States;
 
-use Crumbls\Importer\States\AbstractState;
-use Crumbls\Importer\Support\ColumnDefinition;
-use Crumbls\Importer\Support\DatabaseGenerator;
 use Crumbls\Importer\Support\MySQLToSQLiteConverter;
-use Crumbls\Importer\Support\SqlFileIterator;
-use Crumbls\Importer\Traits\HasSqlImporter;
-use PDO;
-
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
-use Crumbls\Importer\States\ConvertToDatabaseState as BaseState;
+use Illuminate\Database\Schema\Blueprint;
+
+use Crumbls\Importer\Drivers\Common\States\SqlToDatabaseState as BaseState;
+
 class ConvertToDatabaseState extends BaseState
 {
-
+	protected function generateColumn(Blueprint $table, array $definition): void
+	{
+		parent::generateColumn($table, $definition);
+	}
 }

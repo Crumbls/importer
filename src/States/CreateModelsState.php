@@ -7,6 +7,10 @@ use Crumbls\Importer\Support\ColumnMapper;
 use PDO;
 use Illuminate\Support\Str;
 
+/**
+ * A state to create models from a database.
+ * @deprecated
+ */
 class CreateModelsState extends AbstractState
 {
 
@@ -16,6 +20,7 @@ class CreateModelsState extends AbstractState
 
 	public function handle(): void {
 
+		dd(__LINE__);
 		$record = $this->getRecord();
 
 		$md = $record->metadata ?? [];

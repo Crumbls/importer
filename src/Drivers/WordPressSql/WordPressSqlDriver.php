@@ -4,6 +4,9 @@ namespace Crumbls\Importer\Drivers\WordPressSql;
 
 use Crumbls\Importer\Contracts\DriverInterface;
 use Crumbls\Importer\Drivers\AbstractDriver;
+use Crumbls\Importer\Drivers\Common\States\DatabaseToMigrationState;
+use Crumbls\Importer\Drivers\Common\States\DatabaseToModelState;
+use Crumbls\Importer\Drivers\WordPress\States\MapModelsState;
 use Crumbls\Importer\Drivers\WordPressSql\States\CompleteState;
 use Crumbls\Importer\Drivers\WordPressSql\States\ConvertToDatabaseState;
 use Crumbls\Importer\Drivers\WordPressSql\States\DetermineTablePrefixState;
@@ -12,7 +15,7 @@ use Crumbls\Importer\Drivers\WordPressSql\States\MapPostTypesState;
 use Crumbls\Importer\Drivers\WordPressSql\States\ValidateState;
 use Crumbls\Importer\States\CreateFilamentResourcesState;
 use Crumbls\Importer\States\CreateMigrationsState;
-use Crumbls\Importer\States\CreateModelsState;
+
 use Crumbls\Importer\Traits\HasSqlImporter;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
@@ -29,7 +32,9 @@ class WordPressSqlDriver extends AbstractDriver implements DriverInterface
 			ValidateState::class,
 			ConvertToDatabaseState::class,
 			MapPostTypesState::class,
-			CreateModelsState::class,
+			MapModelsState::class,
+			DatabaseToModelState::class,
+			DatabaseToMigrationState::class,
 			CompleteState::class
 		];
 	}
@@ -46,12 +51,15 @@ class WordPressSqlDriver extends AbstractDriver implements DriverInterface
 				MapPostTypesState::class
 			],
 			MapPostTypesState::class => [
-				CreateModelsState::class
+				MapModelsState::class
 			],
-			CreateModelsState::class => [
-				CreateMigrationsState::class
+			MapModelsState::class => [
+				DatabaseToModelState::class,
 			],
-			CreateMigrationsState::class => [
+			DatabaseToModelState::class => [
+				DatabaseToMigrationState::class
+			],
+			DatabaseToMigrationState::class => [
 				CreateFilamentResourcesState::class
 			],
 			CreateFilamentResourcesState::class => [

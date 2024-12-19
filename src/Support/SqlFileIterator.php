@@ -2,6 +2,9 @@
 
 namespace Crumbls\Importer\Support;
 
+/**
+ * @deprecated
+ */
 class SqlFileIterator implements \Iterator {
 	private $handle;
 	private $position = 0;

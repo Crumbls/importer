@@ -21,35 +21,8 @@ use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
 
-class WordPressXmlDriver extends AbstractDriver implements DriverInterface, ColumnMappingInterface
+class WordPressXmlDriver extends AbstractDriver implements DriverInterface //, ColumnMappingInterface
 {
-	use HasColumnMapping;
-
-
-	protected function getDefaultColumnMap(): array {
-		return [
-			'ID' => 'id',
-			'post_content' => 'content',
-			'post_title' => 'title',
-			'post_excerpt' => 'excerpt',
-			'post_status' => 'status',
-			'post_name' => 'slug',
-			'post_author' => 'author_id',
-			'post_parent' => 'parent_id',
-			'post_date' => 'created_at',
-			'post_modified' => 'updated_at'
-		];
-	}
-
-	protected function getDefaultTransforms(): array {
-		return [
-			'ID' => 'integer',
-			'post_author' => 'integer',
-			'post_parent' => 'integer',
-			'post_date' => 'datetime',
-			'post_modified' => 'datetime'
-		];
-	}
 
 	public static function getRegisteredStates(): array {
 		return [

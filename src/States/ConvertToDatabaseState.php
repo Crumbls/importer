@@ -16,8 +16,10 @@ use PhpMyAdmin\SqlParser\Statements\CreateStatement;
 use PhpMyAdmin\SqlParser\Statements\InsertStatement;
 
 
+/**
+ * @deprecated
+ */
 abstract class ConvertToDatabaseState extends AbstractState {
-	protected SqlFileIterator $iterator;
 
 
 	public function getName(): string
@@ -57,18 +59,16 @@ abstract class ConvertToDatabaseState extends AbstractState {
 		$db = new PDO('sqlite:' . $dbPath);
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-		// b
-
 		/**
 		 * We reconfigure it here.
 		 * TODO: We really need to improve this.
 		 */
 		$this->getDriver()->getImportConnection();
 
+		dd($record->source);
 		/**
 		 * Iterate over our sql file.
 		 */
-		$this->iterator = new SqlFileIterator($record->source);
 		foreach ($this->iterator as $statement) {
 			$this->processStatement($statement);
 		}
@@ -228,235 +228,6 @@ abstract class ConvertToDatabaseState extends AbstractState {
 		return trim($identifier, '`"');
 	}
 
-	/**
-	 * Handle CREATE TABLE statements
-	 * TODO: Fix this whole method.
-	 */
-	protected function handleCreateTable(string $statement): void {
-		$tableName = $this->getTableName($statement);
-
-		// Get everything between parentheses
-		if (!preg_match('/\((.*)\)/s', $statement, $matches)) {
-			return;
-		}
-
-		$columnDefinitions = $this->parseColumnDefinitions($matches[1]);
-
-		// Use Schema builder
-		Schema::connection($this->getDriver()->getImportConnectionName())
-			->create($tableName, function (Blueprint $table) use ($columnDefinitions) {
-				foreach ($columnDefinitions as $definition) {
-					$this->addColumn($table, $definition);
-				}
-			});
-//		dd($statement);
-	}
-
-	/**
-	 * @deprecated
-	 * Handle INSERT INTO statements
-	 */
-	protected function handleInsertOld(string $statement): void {
-		// Extract table name
-		if (!preg_match('/INSERT INTO\s+[`"]?([^`"\s]+)[`"]?\s*/i', $statement, $matches)) {
-			return;
-		}
-
-		$tableName = $this->cleanIdentifier($matches[1]);
-
-
-		$connection = $this->getDriver()->getImportConnectionName();
-
-		// Get all possible columns from the table
-		$allTableColumns = Schema::connection($connection)->getColumnListing($tableName);
-
-
-
-		/**
-		 * TODO: Just doing a rewrite.  ffs.
-		 */
-		// Extract specified columns if any
-		$specifiedColumns = [];
-		if (preg_match('/\((.*?)\)\s+VALUES/i', $statement, $matches)) {
-			$specifiedColumns = array_map(function($column) {
-				return $this->cleanIdentifier($column);
-			}, explode(',', $matches[1]));
-		}
-		if ($specifiedColumns) {
-			dd($specifiedColumns);
-		}
-
-		// Extract values
-		if (!preg_match('/VALUES\s*(.*);$/is', $statement, $matches)) {
-			return;
-		}
-
-		$converter = new SqlToQueryBuilder($this->getDriver()->getImportConnection());
-		$f = $converter->convert($statement);
-
-		dd($f);
-dd($statement);
-		$valueString = $matches[1];
-
-//		dd($valueString);
-
-		/**
-		 * TODO: Below this we are scrapping it all.
-		 */
-
-		if (!empty($specifiedColumns)) {
-			// If columns were specified, use those for the insert
-			$rows = $this->parseValues($valueString, $specifiedColumns);
-		} else {
-			// If no columns specified, match values count with table columns
-			$sampleValues = $this->parseValueSet(explode('),(', $valueString)[0]);
-			$columnsToUse = array_slice($allTableColumns, 0, count($sampleValues));
-			$rows = $this->parseValues($valueString, $columnsToUse);
-		}
-
-// Using specific connection
-// Convert and execute queries
-//		$result = $converter->convert("SELECT * FROM users WHERE age > 18")->get();
-//		dd($result);
-//		$result = $converter->convert("INSERT INTO users (name, email) VALUES ('John', 'john@example.com')")->execute();
-
-		foreach($rows as $row) {
-			dd($row);
-		}
-
-		dd($rows);
-
-		// Insert in chunks to avoid memory issues
-		foreach (array_chunk($rows, 1000) as $chunk) {
-			try {
-				$this->getDriver()
-					->getImportConnection()
-					->table($tableName)
-					->insert($chunk);
-			} catch (\Exception $e) {
-				// Log the error and continue
-				\Log::error("Error inserting into {$tableName}: " . $e->getMessage(), [
-					'chunk_size' => count($chunk),
-					'columns' => array_keys($chunk[0] ?? []),
-					'table_columns' => $allTableColumns
-				]);
-				throw $e;
-			}
-		}
-	}
-
-	protected function parseValues(string $valueString, array $columns): array {
-		$rows = [];
-		$pattern = '/\(((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*)\)/';
-
-		if (preg_match_all($pattern, $valueString, $matches)) {
-			foreach ($matches[1] as $valueSet) {
-				$values = $this->parseValueSet($valueSet);
-				if (count($values) === count($columns)) {
-					$rows[] = array_combine($columns, $values);
-					continue;
-				}
-				$rows[] = $values;
-				dump($values);
-				dump($columns);
-				continue;
-				if (count($values) !== count($columns)) {
-					$this->getDriver()->getImportConnection()
-						->table('test')
-						->insert($values);
-					dd($values, $columns);
-					throw new \Exception(sprintf(
-						"Column count (%d) doesn't match values count (%d)",
-						count($columns),
-						count($values)
-					));
-				}
-			}
-		}
-
-		return $rows;
-	}
-
-	/**
-	 * @deprecated
-	 * @param string $valueSet
-	 * @return array
-	 */
-	protected function parseValueSet(string $valueSet): array {
-		dump(__LINE__);
-		$values = [];
-		$currentValue = '';
-		$inQuote = false;
-		$quoteChar = '';
-
-		for ($i = 0; $i < strlen($valueSet); $i++) {
-			$char = $valueSet[$i];
-			$prevChar = $i > 0 ? $valueSet[$i - 1] : '';
-
-			// Handle quotes
-			if (($char === "'" || $char === '"') && $prevChar !== '\\') {
-				if (!$inQuote) {
-					$inQuote = true;
-					$quoteChar = $char;
-					continue;
-				} elseif ($char === $quoteChar) {
-					$inQuote = false;
-					continue;
-				}
-			}
-
-			// Handle value separation
-			if (!$inQuote && $char === ',') {
-				$values[] = $this->processValue(trim($currentValue));
-				$currentValue = '';
-				continue;
-			}
-
-			$currentValue .= $char;
-		}
-
-		// Add the last value
-		if ($currentValue !== '') {
-			$values[] = $this->processValue(trim($currentValue));
-		}
-
-		return $values;
-	}
-
-	/**
-	 * @deprecated
-	 * @param string $value
-	 * @return mixed
-	 */
-	protected function processValueOld(string $value): mixed {
-		dump(__LINE__);
-		// Handle NULL
-		if (strtoupper($value) === 'NULL') {
-			return null;
-		}
-
-		// Handle numbers
-		if (is_numeric($value)) {
-			return strpos($value, '.') !== false ? (float)$value : (int)$value;
-		}
-
-		// Handle quoted strings
-		if (preg_match('/^[\'"](.*?)[\'"]$/s', $value, $matches)) {
-			return $matches[1];
-		}
-
-		// Handle escaped values
-		if (preg_match('/^[\'"]/s', $value)) {
-			$value = substr($value, 1, -1);
-		}
-
-		return str_replace(
-			['\\\\', "\\'", '\\"', '\\n', '\\r', '\\t'],
-			['\\', "'", '"', "\n", "\r", "\t"],
-			$value
-		);
-	}
-
 	protected function handleCreate(CreateStatement $statement) : void {
 		$tableName = $statement->name->table;
 
@@ -518,107 +289,12 @@ dd($statement);
 	}
 
 	/**
-	 * @deprecated
-	 * @param array $definition
-	 * @param string $indent
-	 * @return string
-	 */
-	protected function generateColumnCode(array $definition, string $indent): string
-	{
-		// Handle key definitions
-		if (isset($definition['type']) && $definition['type'] === 'key') {
-			return $this->generateKeyCode($definition, $indent);
-		}
-
-		if (!array_key_exists('primary', $definition)) {
-			$definition['primary'] = false;
-		}
-
-		$code = $indent . "\$table->";
-
-		// Map MySQL types to Laravel column types
-		$typeMap = [
-			'INT' => 'integer',
-			'VARCHAR' => 'string',
-			'TEXT' => 'text',
-			'DATETIME' => 'dateTime',
-			'TIMESTAMP' => 'timestamp',
-			'BOOLEAN' => 'boolean',
-			// Add more type mappings as needed
-		];
-
-		$type = $typeMap[strtoupper($definition['type'])] ?? 'string';
-
-		if ($definition['length'] && $type === 'string') {
-			$code .= "$type('{$definition['name']}', {$definition['length'][0]})";
-		} else {
-			$code .= "$type('{$definition['name']}')";
-		}
-
-		if ($definition['unsigned']) {
-			$code .= "->unsigned()";
-		}
-
-		if ($definition['nullable']) {
-			$code .= "->nullable()";
-		}
-
-		if ($definition['default'] !== null) {
-			$defaultValue = is_numeric($definition['default'])
-				? $definition['default']
-				: "'{$definition['default']}'";
-			$code .= "->default($defaultValue)";
-		}
-
-		if ($definition['autoIncrement']) {
-			$code .= "->autoIncrement()";
-		}
-
-		if ($definition['primary']) {
-			$code .= "->primary()";
-		}
-
-		$code .= ";\n";
-
-		return $code;
-	}
-
-	/**
-	 * @deprecated
-	 * @param array $definition
-	 * @param string $indent
-	 * @return string
-	 */
-	private function generateKeyCode(array $definition, string $indent): string
-	{
-		$code = $indent . "\$table->";
-
-		switch ($definition['key_type']) {
-			case 'PRIMARY KEY':
-				$columns = array_map(fn($col) => "'{$col}'", $definition['columns']);
-				$code .= "primary([" . implode(', ', $columns) . "])";
-				break;
-			case 'UNIQUE':
-				$columns = array_map(fn($col) => "'{$col}'", $definition['columns']);
-				$code .= "unique([" . implode(', ', $columns) . "])";
-				break;
-			case 'INDEX':
-				$columns = array_map(fn($col) => "'{$col}'", $definition['columns']);
-				$code .= "index([" . implode(', ', $columns) . "])";
-				break;
-		}
-
-		$code .= ";\n";
-		return $code;
-	}
-
-	/**
 	 * @param Blueprint $table
 	 * @param array $definition
 	 * @return void
 	 */
 
-	private function generateColumn(Blueprint $table, array $definition): void
+	protected function generateColumn(Blueprint $table, array $definition): void
 	{
 		// If it's a key definition, handle it differently
 		if (isset($definition['type']) && $definition['type'] === 'key') {
@@ -696,10 +372,14 @@ dd($statement);
 		$hasDefinedColumns = !empty($statement->into->columns);
 		$columns = [];
 		if ($hasDefinedColumns) {
-			$columns = array_map(
-				fn($col) => $col->column,
-				$statement->into->columns
-			);
+			try {
+				$columns = array_map(
+					fn($col) => is_object($col) ? $col->column : $col,
+					$statement->into->columns
+				);
+			} catch (\Throwable $e) {
+				dd($e, $hasDefinedColumns);
+			}
 		} else {
 			// If no columns specified, we need to get them from the table structure
 			$columns = $this->getDriver()->getImportConnection()

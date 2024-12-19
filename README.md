@@ -4,15 +4,17 @@ A flexible, state-based importer package for Laravel with support for CSV, SQL, 
 
 ## This is early beta and should not be used.  
 
-It is being rewritten today 12-08-2024.
+Right now, it will take either a WordPress sql, XML, or connection and localize it to a sqlite database.  It then
+generates models.
 
-Forks appreciated, input valued.
+The next step is to handle migrations.  We will see if a table already exists, if it does, update what is necessary.  
+Otherwise, create from scratch.  I have it working as a command, but need to integrate it into the package.
 
-1) Verify input
-2) Standardize input 
-3) Make an educated guess on the output
-4) Get approval for output
-5) Process
+Then create Filament resource.
+
+Then it's just moving data.
+
+Move all of these so they run through a job process so it can be paused as necessary.
 
 ## Installation
 
