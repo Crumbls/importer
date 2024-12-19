@@ -28,10 +28,10 @@ Seriously, don't use this yet.  I'm reworking a few things that I think will mak
 to do more than just WordPress.  
 
 This is what I am running to pull random import xml files from WordPress for tests right now.  Syntax is similar for
-WP connections or sql files ( not yet supported )  
+WP connections ( not yet supported ) or sql files.   
 
-Right now, I'm throwing hundreds of files I've pulled from the internet at it to test with. Taking a break for breakfast
-and then I'll be back.
+Right now, I'm throwing hundreds of files I've pulled from the internet at it to test with. It works properly with sql or xml.
+
 ```
 	$file = \Arr::random(glob(base_path('import-tests').'/*.xml'));
 	$import = \Crumbls\Importer\Models\Import::firstOrCreate([
