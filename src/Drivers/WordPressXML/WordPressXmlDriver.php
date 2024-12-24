@@ -6,20 +6,17 @@ use Crumbls\Importer\Contracts\ColumnMappingInterface;
 use Crumbls\Importer\Contracts\DriverInterface;
 use Crumbls\Importer\Drivers\AbstractDriver;
 use Crumbls\Importer\Drivers\Common\States\CompleteState;
+use Crumbls\Importer\Drivers\Common\States\CreateFilamentResourcesState;
 use Crumbls\Importer\Drivers\WordPressXML\States\ConvertToDatabaseState;
 use Crumbls\Importer\Drivers\WordPressXML\States\InitializeState;
 use Crumbls\Importer\Drivers\WordPressXML\States\MapPostTypesState;
 use Crumbls\Importer\Drivers\WordPressXML\States\ValidateState;
-use Crumbls\Importer\Models\Import;
-use Crumbls\Importer\Drivers\Common\States\CreateFilamentResourcesState;
 use Crumbls\Importer\States\CreateMigrationsState;
 use Crumbls\Importer\States\CreateModelsState;
 use Crumbls\Importer\Traits\HasColumnMapping;
-use Crumbls\Importer\Traits\HasImportConnection;
-use Crumbls\Importer\Traits\HasWordPressColumns;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 
 class WordPressXmlDriver extends AbstractDriver implements DriverInterface //, ColumnMappingInterface
 {

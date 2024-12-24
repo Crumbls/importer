@@ -3,7 +3,6 @@
 namespace Crumbls\Importer\States;
 
 use Crumbls\Importer\Support\SqlFileIterator;
-
 use Crumbls\Importer\Support\SqlToQueryBuilder;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;

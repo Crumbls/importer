@@ -3,7 +3,6 @@
 namespace Crumbls\Importer\Drivers\WordPressXML\States;
 
 use Crumbls\Importer\States\AbstractState;
-use DOMDocument;
 
 class ValidateState extends AbstractState {
 	private const REQUIRED_NAMESPACES = [

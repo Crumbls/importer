@@ -6,9 +6,7 @@ namespace Crumbls\Importer\Drivers\Common\States;
 use Crumbls\Importer\Models\ImportLog;
 use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\Support\ModelAnalyzer;
-use PDO;
 use Illuminate\Support\Str;
-
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\PhpFile;
 use Nette\PhpGenerator\PsrPrinter;

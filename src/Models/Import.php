@@ -3,7 +3,6 @@
 namespace Crumbls\Importer\Models;
 
 use Crumbls\Importer\Contracts\DriverInterface;
-use Crumbls\Importer\Importer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -26,8 +25,9 @@ class Import extends Model
 	 * For now, this lives here.
 	 * @return void
 	 */
-	public static function booted() : void {
-		static::creating(function(Model $record) {
+	public static function booted(): void
+	{
+		static::creating(function (Model $record) {
 			$record->state;
 		});
 	}
@@ -68,7 +68,8 @@ class Import extends Model
 	 * @return DriverInterface
 	 * @throws \Exception
 	 */
-	public function getDriver() : DriverInterface {
+	public function getDriver(): DriverInterface
+	{
 		if (isset($this->_driver)) {
 			return $this->_driver;
 		}
@@ -80,12 +81,10 @@ class Import extends Model
 		}
 
 		$this->_driver = app('importer')
-			->driver($this->attributes['driver'])
-			;
+			->driver($this->attributes['driver']);
 
 		$this->_driver
-			->setRecord($this)
-		;
+			->setRecord($this);
 
 		/**
 		 * TODO: Add configuration as necessary.
@@ -99,7 +98,8 @@ class Import extends Model
 	 * @return string
 	 * @throws \Exception
 	 */
-	public function getStateAttribute() : string {
+	public function getStateAttribute(): string
+	{
 		if (array_key_exists('state', $this->attributes) && $this->attributes['state']) {
 			return $this->attributes['state'];
 		}

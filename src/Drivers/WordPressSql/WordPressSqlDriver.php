@@ -4,23 +4,21 @@ namespace Crumbls\Importer\Drivers\WordPressSql;
 
 use Crumbls\Importer\Contracts\DriverInterface;
 use Crumbls\Importer\Drivers\AbstractDriver;
+use Crumbls\Importer\Drivers\Common\States\CompleteState;
+use Crumbls\Importer\Drivers\Common\States\CreateFilamentResourcesState;
 use Crumbls\Importer\Drivers\Common\States\DatabaseToMigrationState;
 use Crumbls\Importer\Drivers\Common\States\DatabaseToModelState;
 use Crumbls\Importer\Drivers\Common\States\ExecuteMigrations;
 use Crumbls\Importer\Drivers\WordPress\States\MapModelsState;
-use Crumbls\Importer\Drivers\Common\States\CompleteState;
 use Crumbls\Importer\Drivers\WordPressSql\States\ConvertToDatabaseState;
 use Crumbls\Importer\Drivers\WordPressSql\States\DetermineTablePrefixState;
 use Crumbls\Importer\Drivers\WordPressSql\States\InitializeState;
 use Crumbls\Importer\Drivers\WordPressSql\States\MapPostTypesState;
 use Crumbls\Importer\Drivers\WordPressSql\States\ValidateState;
-use Crumbls\Importer\Drivers\Common\States\CreateFilamentResourcesState;
 use Crumbls\Importer\States\CreateMigrationsState;
-
-use Crumbls\Importer\Traits\HasSqlImporter;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 
 /**
  * TODO: Not yet implemented.

@@ -3,8 +3,8 @@
 namespace Crumbls\Importer\Support;
 
 use ReflectionClass;
-use ReflectionProperty;
 use ReflectionNamedType;
+use ReflectionProperty;
 
 class ModelAnalyzer
 {

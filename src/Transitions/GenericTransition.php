@@ -2,7 +2,6 @@
 
 namespace Crumbls\Importer\Transitions;
 
-use Crumbls\Importer\Transitions\AbstractTransition;
 use Crumbls\Importer\States\AbstractState;
 
 class GenericTransition extends AbstractTransition {

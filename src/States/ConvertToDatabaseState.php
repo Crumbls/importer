@@ -2,18 +2,15 @@
 
 namespace Crumbls\Importer\States;
 
-use Crumbls\Importer\Support\SqlFileIterator;
-
-use Crumbls\Importer\Support\SqlToQueryBuilder;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use PDO;
 use PhpMyAdmin\SqlParser\Parser;
-use PhpMyAdmin\SqlParser\Utils\Query;
 use PhpMyAdmin\SqlParser\Statement;
 use PhpMyAdmin\SqlParser\Statements\CreateStatement;
 use PhpMyAdmin\SqlParser\Statements\InsertStatement;
+use PhpMyAdmin\SqlParser\Utils\Query;
 
 
 /**

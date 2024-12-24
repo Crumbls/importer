@@ -3,15 +3,12 @@
 namespace Crumbls\Importer\Drivers\Common\States;
 
 use Crumbls\Importer\States\AbstractState;
-use Crumbls\Importer\Support\SqlFileIterator;
-
-use Crumbls\Importer\Support\SqlToQueryBuilder;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use PDO;
+use PhpMyAdmin\SqlParser\Lexer;
 use PhpMyAdmin\SqlParser\Parser;
-use PhpMyAdmin\SqlParser\Utils\Query;
 use PhpMyAdmin\SqlParser\Statement;
 use PhpMyAdmin\SqlParser\Statements\AlterStatement;
 use PhpMyAdmin\SqlParser\Statements\CreateStatement;
@@ -19,8 +16,7 @@ use PhpMyAdmin\SqlParser\Statements\DropStatement;
 use PhpMyAdmin\SqlParser\Statements\InsertStatement;
 use PhpMyAdmin\SqlParser\Statements\LockStatement;
 use PhpMyAdmin\SqlParser\Statements\SetStatement;
-
-use PhpMyAdmin\SqlParser\Lexer;
+use PhpMyAdmin\SqlParser\Utils\Query;
 
 abstract class SqlToDatabaseState extends AbstractState {
 	private int $chunkSize = 8192;

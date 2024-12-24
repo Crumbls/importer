@@ -3,12 +3,12 @@
 namespace Crumbls\Importer\Support;
 
 
-use Illuminate\Support\Facades\DB;
-use PHPSQLParser\PHPSQLParser;
-use Illuminate\Database\Query\Builder;
 use Exception;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
 use PhpMyAdmin\SqlParser\Parser;
 use PhpMyAdmin\SqlParser\Utils\Query;
+use PHPSQLParser\PHPSQLParser;
 
 class SqlToQueryBuilder
 {

@@ -6,8 +6,8 @@ use Crumbls\Importer\Contracts\DriverInterface;
 use Crumbls\Importer\Traits\HasImportConnection;
 use Crumbls\Importer\Traits\HasStates;
 use Crumbls\Importer\Transitions\GenericTransition;
-use Illuminate\Support\Arr;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 
 abstract class AbstractDriver implements DriverInterface
 {

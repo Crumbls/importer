@@ -3,8 +3,8 @@
 namespace Crumbls\Importer\Traits;
 
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 
 trait HasImportConnection {
 	public function getImportConnectionName() : ?string {

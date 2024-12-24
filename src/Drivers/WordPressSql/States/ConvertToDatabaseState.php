@@ -2,13 +2,12 @@
 
 namespace Crumbls\Importer\Drivers\WordPressSql\States;
 
+use Crumbls\Importer\Drivers\Common\States\SqlToDatabaseState as BaseState;
 use Crumbls\Importer\Support\MySQLToSQLiteConverter;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Database\Schema\Blueprint;
-
-use Crumbls\Importer\Drivers\Common\States\SqlToDatabaseState as BaseState;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 
 class ConvertToDatabaseState extends BaseState
 {

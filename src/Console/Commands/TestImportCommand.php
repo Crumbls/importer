@@ -4,9 +4,9 @@ namespace Crumbls\Importer\Console\Commands;
 
 use Crumbls\Importer\Drivers\WordPressXML\Stages\AnalyzeContentStage;
 use Crumbls\Importer\Drivers\WordPressXML\Stages\ValidateFileStage;
-use Illuminate\Console\Command;
 use Crumbls\Importer\Facades\Importer;
 use Crumbls\Importer\Models\Import;
+use Illuminate\Console\Command;
 
 class TestImportCommand extends Command
 {

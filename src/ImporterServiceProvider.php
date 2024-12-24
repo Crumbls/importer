@@ -4,12 +4,12 @@ namespace Crumbls\Importer;
 
 
 use Crumbls\Importer\Console\Commands\TestImportCommand;
+use Crumbls\Importer\Support\ImportManager;
 use Illuminate\Database\Eloquent;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
-use Crumbls\Importer\Support\ImportManager;
 
 class ImporterServiceProvider extends ServiceProvider
 {

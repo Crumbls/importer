@@ -3,14 +3,11 @@
 namespace Crumbls\Importer\Drivers\WordPress\States;
 
 use Crumbls\Importer\States\AbstractState;
-use Crumbls\Importer\Support\ColumnMapper;
 use Crumbls\Importer\Traits\HasTableTransformer;
 use Crumbls\Importer\Traits\HasTransformerDefinition;
 use Crumbls\Importer\Traits\IsTableSchemaAware;
 use Crumbls\Importer\Transformers\TransformationDefinition;
-use PDO;
 use Illuminate\Support\Str;
-
 use Selective\Transformer\ArrayTransformer;
 
 /**

@@ -4,13 +4,13 @@ namespace Crumbls\Importer\Traits;
 
 use Crumbls\Importer\Support\ColumnDefinition;
 use Crumbls\Importer\Support\SqlFileIterator;
-use Illuminate\Support\Facades\DB;
 use Exception;
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Container\Container;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Traits\Macroable;
 
 trait HasSqlImporter {

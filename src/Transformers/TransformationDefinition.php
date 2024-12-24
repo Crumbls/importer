@@ -2,8 +2,8 @@
 
 namespace Crumbls\Importer\Transformers;
 
-use Selective\Transformer\ArrayTransformer;
 use InvalidArgumentException;
+use Selective\Transformer\ArrayTransformer;
 
 class TransformationDefinition
 {

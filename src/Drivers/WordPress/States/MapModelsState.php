@@ -2,17 +2,11 @@
 
 namespace Crumbls\Importer\Drivers\WordPress\States;
 
-use Crumbls\Importer\States\AbstractState;
-use Crumbls\Importer\Support\ColumnMapper;
-use Crumbls\Importer\Traits\HasTableTransformer;
-use Crumbls\Importer\Traits\HasTransformerDefinition;
-use Crumbls\Importer\Traits\IsTableSchemaAware;
-use Crumbls\Importer\Transformers\TransformationDefinition;
-use PDO;
-use Illuminate\Support\Str;
-
-use Selective\Transformer\ArrayTransformer;
 use Crumbls\Importer\Drivers\Common\States\MapModelsState as BaseState;
+use Crumbls\Importer\Traits\HasTableTransformer;
+use Illuminate\Support\Str;
+use Selective\Transformer\ArrayTransformer;
+
 /**
  * TODO: We will end up using a version of this code under common code to map other tables.
  * This is here just as a brainstorming point.

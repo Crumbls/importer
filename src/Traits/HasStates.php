@@ -2,11 +2,10 @@
 
 namespace Crumbls\Importer\Traits;
 
-use Crumbls\Importer\Models\Import;
 use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\Transitions\AbstractTransition;
-use Crumbls\Importer\Transitions\GenericTransition;
 use Illuminate\Database\Eloquent\Model;
+
 trait HasStates {
 	protected AbstractState $state;
 
