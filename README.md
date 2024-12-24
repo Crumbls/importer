@@ -5,16 +5,14 @@ A flexible, state-based importer package for Laravel with support for CSV, SQL, 
 ## This is early beta and should not be used.  
 
 Right now, it will take either a WordPress sql, XML, or connection and localize it to a sqlite database.  It then
-generates models.
+generates models, migrations, and then Filament resources.
 
-The next step is to handle migrations.  We will see if a table already exists, if it does, update what is necessary.  
-Otherwise, create from scratch.  I have it working as a command, but need to integrate it into the package.
+It stores the data in a local, temporary, SQLite database to help handle large files or migrations down the road.
 
-Then create Filament resource.
+Right now, I am trying to figure out the best way to move data from that to the live server eloquently.  I'm doing some testing,
+but would love any input.
 
-Then it's just moving data.
-
-Move all of these so they run through a job process so it can be paused as necessary.
+After this, I'll build an official Filament package to manage this for the non-command line folk.
 
 ## Installation
 
