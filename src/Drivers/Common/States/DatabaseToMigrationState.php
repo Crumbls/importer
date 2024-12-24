@@ -101,12 +101,17 @@ return new class extends Migration '.$class.';';
 	}
 
 	protected function generateUpMethod($method, array $transformer): void {
-		$method->setBody(sprintf(
-			'Schema::create($this->getTable(), function (Blueprint $table) {
+		$body = '$table = $this->getTable();
+			if (Schema::hasTable($table)) {
+				return;
+			}'.
+			sprintf(
+				'Schema::create($this->getTable(), function (Blueprint $table) {
                 %s
             });',
-			$this->generateColumns($transformer)
-		));
+				$this->generateColumns($transformer)
+			);
+		$method->setBody($body);
 	}
 
 	protected function generateDownMethod($method, array $transformer): void {

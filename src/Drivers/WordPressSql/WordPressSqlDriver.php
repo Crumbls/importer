@@ -6,6 +6,7 @@ use Crumbls\Importer\Contracts\DriverInterface;
 use Crumbls\Importer\Drivers\AbstractDriver;
 use Crumbls\Importer\Drivers\Common\States\CompleteState;
 use Crumbls\Importer\Drivers\Common\States\CreateFilamentResourcesState;
+use Crumbls\Importer\Drivers\Common\States\DatabaseToDatabaseState;
 use Crumbls\Importer\Drivers\Common\States\DatabaseToMigrationState;
 use Crumbls\Importer\Drivers\Common\States\DatabaseToModelState;
 use Crumbls\Importer\Drivers\Common\States\ExecuteMigrations;
@@ -65,16 +66,14 @@ class WordPressSqlDriver extends AbstractDriver implements DriverInterface
 				CreateFilamentResourcesState::class
 			],
 			CreateFilamentResourcesState::class => [
+				DatabaseToDatabaseState::class
+			],
+			DatabaseToDatabaseState::class => [
 				CompleteState::class
 			]
 		];
 	}
 
-
-
-	/**
-	 * Create new driver with optional config
-	 */
 
 	/**
 	 * Get the name of the driver

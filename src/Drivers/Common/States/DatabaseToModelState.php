@@ -6,6 +6,7 @@ namespace Crumbls\Importer\Drivers\Common\States;
 use Crumbls\Importer\Models\ImportLog;
 use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\Support\ModelAnalyzer;
+use Crumbls\Importer\Traits\IsComposerAware;
 use Illuminate\Support\Str;
 use Nette\PhpGenerator\ClassType;
 use Nette\PhpGenerator\PhpFile;
@@ -17,7 +18,7 @@ use ReflectionClass;
  */
 class DatabaseToModelState extends AbstractState
 {
-	private array $composerJson;
+	use IsComposerAware;
 	private ModelAnalyzer $analyzer;
 	public function getName(): string
 	{
@@ -32,16 +33,6 @@ class DatabaseToModelState extends AbstractState
 
 		$md['transformers'] = $md['transformers'] ?? [];
 
-		// a
-
-		$this->composerJson = json_decode(file_get_contents(base_path('composer.json')), true);
-
-		if (!isset($this->composerJson['autoload']['psr-4'])) {
-			throw new \RuntimeException("No PSR-4 autoload configuration found in composer.json");
-		}
-		// b
-
-
 		foreach ($md['transformers'] as $transformer) {
 			$this->generate($transformer);
 		}
@@ -50,7 +41,7 @@ class DatabaseToModelState extends AbstractState
 	protected function generate(array $transformer): void
 	{
 		if (class_exists($transformer['model_name'])) {
-			dump('Class already exists: ' . $transformer['model_name']);
+//			dump('Class already exists: ' . $transformer['model_name']);
 			$this->verifyExistingModel($transformer);
 			return;
 		}
@@ -120,6 +111,11 @@ class DatabaseToModelState extends AbstractState
 			$destination,
 			$output
 		);
+
+		/**
+		 * Bring the model into the fold for a migration later.
+		 */
+		include_once($destination);
 	}
 
 	private function getNamespaceFromModelName(string $modelName): string
@@ -192,34 +188,10 @@ class DatabaseToModelState extends AbstractState
 		// Remove leading backslash if present
 		$fullyQualifiedClassName = ltrim($fullyQualifiedClassName, '\\');
 
-		// Get namespace and class name
-		$lastBackslash = strrpos($fullyQualifiedClassName, '\\');
-		if ($lastBackslash === false) {
-			throw new \InvalidArgumentException("Class name must include namespace");
-		}
 
-		$namespace = substr($fullyQualifiedClassName, 0, $lastBackslash);
-		$className = substr($fullyQualifiedClassName, $lastBackslash + 1);
+//		$className = substr($fullyQualifiedClassName, $lastBackslash + 1);
 
-		// Look through PSR-4 autoload mappings
-		foreach ($this->composerJson['autoload']['psr-4'] as $prefix => $path) {
-			$prefix = rtrim($prefix, '\\');
-			if (strpos($namespace, $prefix) === 0) {
-				// Found matching namespace prefix
-				$relativePath = str_replace('\\', '/', substr($namespace, strlen($prefix)));
-				$basePath = rtrim($path, '/');
-
-				return str_replace('//', '/', sprintf(
-					'%s/%s/%s/%s.php',
-					base_path(),
-					$basePath,
-					$relativePath,
-					$className
-				));
-			}
-		}
-
-		throw new \RuntimeException("No matching PSR-4 autoload configuration found for namespace: {$namespace}");
+		return static::getComposerPathToClass($fullyQualifiedClassName);
 	}
 
 
@@ -302,7 +274,7 @@ class DatabaseToModelState extends AbstractState
 		}
 
 		if ($issues) {
-			dump($issues);
+			dump('We have some issues with '.$transformer['model_name'],$issues);
 		}
 
 		// Log all issues

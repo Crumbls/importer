@@ -7,6 +7,12 @@ use Crumbls\Importer\Contracts\DriverInterface;
 use Crumbls\Importer\Drivers\AbstractDriver;
 use Crumbls\Importer\Drivers\Common\States\CompleteState;
 use Crumbls\Importer\Drivers\Common\States\CreateFilamentResourcesState;
+use Crumbls\Importer\Drivers\Common\States\DatabaseToDatabaseState;
+use Crumbls\Importer\Drivers\Common\States\DatabaseToMigrationState;
+use Crumbls\Importer\Drivers\Common\States\DatabaseToModelState;
+use Crumbls\Importer\Drivers\Common\States\ExecuteMigrations;
+use Crumbls\Importer\Drivers\WordPress\States\MapModelsState;
+use Crumbls\Importer\Drivers\WordPressSql\States\DetermineTablePrefixState;
 use Crumbls\Importer\Drivers\WordPressXML\States\ConvertToDatabaseState;
 use Crumbls\Importer\Drivers\WordPressXML\States\InitializeState;
 use Crumbls\Importer\Drivers\WordPressXML\States\MapPostTypesState;
@@ -21,12 +27,16 @@ use Illuminate\Support\Facades\DB;
 class WordPressXmlDriver extends AbstractDriver implements DriverInterface //, ColumnMappingInterface
 {
 
+
 	public static function getRegisteredStates(): array {
 		return [
 			ValidateState::class,
 			ConvertToDatabaseState::class,
 			MapPostTypesState::class,
-			CreateModelsState::class,
+			MapModelsState::class,
+			DatabaseToModelState::class,
+			DatabaseToMigrationState::class,
+			DatabaseToDatabaseState::class,
 			CompleteState::class
 		];
 	}
@@ -37,23 +47,34 @@ class WordPressXmlDriver extends AbstractDriver implements DriverInterface //, C
 				ConvertToDatabaseState::class
 			],
 			ConvertToDatabaseState::class => [
+				DetermineTablePrefixState::class
+			],
+			DetermineTablePrefixState::class => [
 				MapPostTypesState::class
-				],
+			],
 			MapPostTypesState::class => [
-				CreateModelsState::class
+				MapModelsState::class
 			],
-			CreateModelsState::class => [
-				CreateMigrationsState::class
+			MapModelsState::class => [
+				DatabaseToModelState::class,
 			],
-			CreateMigrationsState::class => [
+			DatabaseToModelState::class => [
+				DatabaseToMigrationState::class
+			],
+			DatabaseToMigrationState::class => [
+				ExecuteMigrations::class
+			],
+			ExecuteMigrations::class => [
 				CreateFilamentResourcesState::class
 			],
 			CreateFilamentResourcesState::class => [
+				DatabaseToDatabaseState::class
+			],
+			DatabaseToDatabaseState::class => [
 				CompleteState::class
 			]
 		];
 	}
-
 
 
 	/**

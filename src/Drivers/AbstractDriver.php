@@ -50,7 +50,7 @@ abstract class AbstractDriver implements DriverInterface
 
 	public function setRecord(Model $record) : self {
 		$this->record = $record;
-		$this->initializeState($record->state);
+		$this->initializeState($record->getStateAttribute());
 		return $this;
 	}
 
