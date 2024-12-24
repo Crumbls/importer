@@ -5,6 +5,11 @@ namespace Crumbls\Importer;
 
 use Crumbls\Importer\Console\Commands\TestImportCommand;
 use Crumbls\Importer\Support\ImportManager;
+use Crumbls\Importer\Transformers\Categories\ArrayTransformer;
+use Crumbls\Importer\Transformers\Categories\DateTransformer;
+use Crumbls\Importer\Transformers\Categories\NumberTransformer;
+use Crumbls\Importer\Transformers\Categories\StringTransformer;
+use Crumbls\Importer\Transformers\TransformerRegistry;
 use Illuminate\Database\Eloquent;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Event;
@@ -32,6 +37,17 @@ class ImporterServiceProvider extends ServiceProvider
 	    $this->app->alias('importer', ImportManager::class);
 
 
+	    $this->app->singleton(TransformerRegistry::class, function() {
+		    $registry = new TransformerRegistry();
+
+		    // Register default transformers
+		    $registry->register(new StringTransformer());
+		    $registry->register(new DateTransformer());
+			$registry->register(new NumberTransformer());
+		    $registry->register(new ArrayTransformer());
+
+		    return $registry;
+	    });
     }
 
     /**

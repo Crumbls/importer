@@ -90,6 +90,8 @@ class MapPostTypesState extends AbstractState
 				->to('name')
 				->type('string')
 				->map('post_mime_type')
+				->nullable()
+				->default(null)
 				->to('mime_type')
 				->type('string')
 				->map('post_content')

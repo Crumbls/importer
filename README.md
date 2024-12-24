@@ -12,13 +12,8 @@ generates models, migrations, and Filament resources.
 
 Most drivers will localize the data into a temporary SQLite database to standardize the content.
 
-We are at the point where we are actually migrating the data from the temporary database to the production database
-and just want to weigh our options before rewriting it.  We would love your input.  We don't want to use factories,
-but will probably just create a general migration service for it.
-
-After this, I'll build an official Filament package to manage this for the non-command line folk. Then better comments,
-more tests, and some documentation.
-
+We are officially migrating data from the temporary database to the production one now, but need to work on data
+validation and sanitization in the process while still being aware of resource use.
 
 ## Installation
 
@@ -35,8 +30,7 @@ This is what I am running to pull random import xml / sql files from WordPress f
 WP connections ( not yet supported )   
 
 Right now, I'm throwing hundreds of files I've pulled from the internet at it to test with. It works properly with sql or xml.
-Please, do not do this.  I just want a way to test one of the few hundred exports I have to try and create errors
-with real data.
+Please, do not do this.  I just want a way to test one of theexports I have to try and create errors with real data.
 
 ```
 	Import::each(function($record) {

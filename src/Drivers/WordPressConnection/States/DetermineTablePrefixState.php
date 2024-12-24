@@ -117,7 +117,6 @@ class DetermineTablePrefixState extends AbstractState {
 					}
 				}
 			}, $filtered);
-
 			$uniquePrefixes = array_unique($prefixes);
 			if (count($uniquePrefixes) === 1) {
 				return array_values($uniquePrefixes)[0];

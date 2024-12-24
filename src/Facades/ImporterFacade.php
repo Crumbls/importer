@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \Crumbls\Importer\Contracts\DriverInterface driver(string $driver = null)
  * @method static \Crumbls\Importer\Support\ImportManager extend(string $driver, \Closure $callback)
  */
-class Importer extends Facade
+class ImporterFacade extends Facade
 {
 	protected static function getFacadeAccessor(): string
 	{
