@@ -75,11 +75,8 @@ class DatabaseToDatabaseState extends AbstractState
 				$transformedRecords = $this->transformRecords($records, $transformer);
 
 				if (!empty($transformedRecords)) {
-					dump($transformedRecords);
 					$destinationConnection->table($destinationTable)
 						->insert($transformedRecords);
-				} else {
-					dump(__LINE__);
 				}
 
 				// Log progress
@@ -89,8 +86,7 @@ class DatabaseToDatabaseState extends AbstractState
 			$destinationConnection->commit();
 		} catch (\Exception $e) {
 			$destinationConnection->rollBack();
-dump($e);
-/*
+
 			// Log the error
 			ImportLog::error(
 				$this->getRecord(),
@@ -100,7 +96,7 @@ dump($e);
 					'exception' => $e
 				]
 			);
-*/
+
 			throw $e;
 		}
 	}
