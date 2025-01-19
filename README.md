@@ -5,6 +5,9 @@ A flexible, state-based importer package for Laravel with support for CSV, SQL, 
 First of all, I don't know if there is any audience that needs this.  So if there isn't, I'll just nuke the thing.  If it
 looks like anyone might show some interest, I am happy to develop it out more.
 
+##  Quick update
+I am moving some of this into a side package and will then focus on this.  I just want to separate some of our tasks into reusable components first.
+
 ## This is early beta and should not be used.
 
 It will take either a WordPress sql, XML, or connection and localize it to a sqlite database.  It then
