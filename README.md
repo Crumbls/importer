@@ -16,6 +16,8 @@
 > This is just scaffolding for the next version and will 100% be breaking.
 >
 > If you have any questions about this transition, please reach out via GitHub Issues.
+> 
+> Discord: https://discord.gg/7RZ5Esmn
 
 A Laravel package for importing data from remote sources.
 
