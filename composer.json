@@ -1,0 +1,46 @@
+{
+    "name": "crumbls/importer",
+    "description": "A Laravel package for importing data from external sources",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Chase Miller",
+            "email": "chase@crumbls.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0|^12.0"
+    },
+    "require-dev": {
+        "pestphp/pest": "^2.0",
+        "phpunit/phpunit": "^10.0",
+        "orchestra/testbench": "^8.0|^9.0",
+        "mockery/mockery": "^1.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Crumbls\\Importer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Crumbls\\Importer\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Crumbls\\Importer\\ImporterServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}
