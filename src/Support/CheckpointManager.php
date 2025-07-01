@@ -11,7 +11,7 @@ class CheckpointManager
     public function __construct(string $migrationId, ?string $basePath = null)
     {
         $this->migrationId = $migrationId;
-        $this->checkpointPath = $basePath ?? storage_path('importer/checkpoints');
+        $this->checkpointPath = $basePath ?? $this->getDefaultStoragePath();
         
         // Ensure checkpoint directory exists
         if (!is_dir($this->checkpointPath)) {
@@ -88,6 +88,21 @@ class CheckpointManager
         }
         
         $this->checkpoints = [];
+    }
+    
+    protected function getDefaultStoragePath(): string
+    {
+        if (function_exists('storage_path')) {
+            try {
+                return storage_path('importer/checkpoints');
+            } catch (\Throwable $e) {
+                // Fall through to default
+            }
+        }
+        
+        // Fallback for standalone usage
+        $basePath = sys_get_temp_dir() . '/crumbls-importer';
+        return $basePath . '/checkpoints';
     }
     
     public function canResumeFrom(string $checkpointId): bool

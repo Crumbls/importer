@@ -110,8 +110,8 @@ describe('WPXML Migration Integration', function () {
     });
     
     it('demonstrates comprehensive extraction with migration planning', function () {
-        $wpxmlFile = __DIR__ . '/../demo/wordpress-export.xml';
-        
+        $wpxmlFile = __DIR__ . '/../../resources/wordpress-export.xml';
+
         if (!file_exists($wpxmlFile)) {
             $this->markTestSkipped('WPXML demo file not found');
         }
