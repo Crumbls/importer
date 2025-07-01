@@ -1,0 +1,21 @@
+name: test
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  pest:
+    name: Pest Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+      - name: Run Pest
+        run: vendor/bin/pest
