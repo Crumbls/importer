@@ -4,9 +4,12 @@ namespace Crumbls\Importer\Pipeline;
 
 use Crumbls\Importer\Contracts\ImportResult;
 use Crumbls\Importer\Support\DelimiterDetector;
+use Crumbls\Importer\Adapters\Traits\HasDataTransformation;
+use Crumbls\Importer\Adapters\Traits\HasPerformanceMonitoring;
 
 class ImportPipeline
 {
+    use HasDataTransformation, HasPerformanceMonitoring;
     protected array $steps = [];
     protected PipelineContext $context;
     protected string $stateHash;
@@ -20,13 +23,40 @@ class ImportPipeline
     public function __construct()
     {
         $this->context = new PipelineContext();
-        $this->stateConfig = config('importer.pipeline.state', [
-            'driver' => 'file',
-            'path' => storage_path('pipeline'),
-            'cleanup_after' => 3600,
-        ]);
         
-        $memoryLimitStr = config('importer.pipeline.memory_limit', '256M');
+        // Check if we're running in Laravel by looking for app instance
+        $inLaravel = false;
+        try {
+            if (function_exists('app') && app()->bound('config')) {
+                $inLaravel = true;
+            }
+        } catch (\Exception $e) {
+            $inLaravel = false;
+        }
+        
+        if ($inLaravel) {
+            try {
+                $this->stateConfig = config('importer.pipeline.state', [
+                    'driver' => 'file',
+                    'path' => storage_path('pipeline'),
+                    'cleanup_after' => 3600,
+                ]);
+                $memoryLimitStr = config('importer.pipeline.memory_limit', '256M');
+            } catch (\Exception $e) {
+                $inLaravel = false;
+            }
+        }
+        
+        if (!$inLaravel) {
+            // Standalone configuration
+            $this->stateConfig = [
+                'driver' => 'file',
+                'path' => sys_get_temp_dir() . '/importer-pipeline',
+                'cleanup_after' => 3600,
+            ];
+            $memoryLimitStr = '256M';
+        }
+        
         $this->memoryLimit = $this->parseMemoryLimit($memoryLimitStr);
     }
 
@@ -967,14 +997,6 @@ class ImportPipeline
         return $processedHeaders;
     }
     
-    protected function cleanColumnName(string $columnName): string
-    {
-        // Remove content in parentheses and trim whitespace
-        $cleaned = preg_replace('/\s*\([^)]*\)\s*/', '', trim($columnName));
-        
-        // Convert to snake_case
-        return \Illuminate\Support\Str::snake($cleaned);
-    }
     
     protected function executeParseXmlStructureStep(string $source, array $options, array $driverConfig): array
     {

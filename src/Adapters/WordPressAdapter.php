@@ -7,6 +7,7 @@ use Crumbls\Importer\Adapters\Traits\HasConnection;
 use Crumbls\Importer\Adapters\Traits\HasStrategy;
 use Crumbls\Importer\Adapters\Traits\HasDatabaseOperations;
 use Crumbls\Importer\Adapters\Traits\HasMigrationLogging;
+use Crumbls\Importer\Adapters\Traits\HasPerformanceMonitoring;
 use Crumbls\Importer\Contracts\MigrationAdapter;
 use Crumbls\Importer\Contracts\MigrationPlan;
 use Crumbls\Importer\Contracts\ValidationResult;
@@ -23,7 +24,8 @@ class WordPressAdapter implements MigrationAdapter
 		HasConnection,
 		HasStrategy,
 		HasDatabaseOperations,
-		HasMigrationLogging;
+		HasMigrationLogging,
+		HasPerformanceMonitoring;
 
     public function __construct(mixed $config = [], string $environment = 'production')
     {

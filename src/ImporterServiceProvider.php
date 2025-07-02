@@ -3,6 +3,8 @@
 namespace Crumbls\Importer;
 
 use Illuminate\Support\ServiceProvider;
+use Crumbls\Importer\Console\ImportCommand;
+use Crumbls\Importer\Console\ImportStatusCommand;
 
 class ImporterServiceProvider extends ServiceProvider
 {
@@ -11,6 +13,14 @@ class ImporterServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/importer.php' => config_path('importer.php'),
         ], 'config');
+        
+        // Register console commands
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                ImportCommand::class,
+                ImportStatusCommand::class,
+            ]);
+        }
     }
 
     public function register()

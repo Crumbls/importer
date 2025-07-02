@@ -3,6 +3,7 @@
 namespace Crumbls\Importer;
 
 use Illuminate\Support\Manager;
+use Crumbls\Importer\Support\QueuedImporter;
 use Crumbls\Importer\Drivers\CsvDriver;
 use Crumbls\Importer\Drivers\XmlDriver;
 use Crumbls\Importer\Drivers\WpxmlDriver;
@@ -47,5 +48,29 @@ class ImporterManager extends Manager
     {
         // TODO: Implement SQL driver later
         throw new \Exception('SQL driver not implemented yet');
+    }
+    
+    /**
+     * Create a queued importer instance
+     */
+    public function queued(): QueuedImporter
+    {
+        return new QueuedImporter();
+    }
+    
+    /**
+     * Get import result by ID
+     */
+    public function getResult(string $importId): ?array
+    {
+        return QueuedImporter::getResult($importId);
+    }
+    
+    /**
+     * Check import status
+     */
+    public function getStatus(string $importId): ?string
+    {
+        return QueuedImporter::getStatus($importId);
     }
 }

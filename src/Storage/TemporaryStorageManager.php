@@ -14,10 +14,22 @@ class TemporaryStorageManager
     
     public function __construct(array $config = [])
     {
+        // Default configuration with Laravel-aware path handling
+        $defaultSqlitePath = sys_get_temp_dir() . '/import_storage';
+        
+        // Only try Laravel storage_path if we're confident we're in Laravel
+        try {
+            if (function_exists('app') && app()->bound('config')) {
+                $defaultSqlitePath = storage_path('temp/import_storage');
+            }
+        } catch (\Exception $e) {
+            // Fall back to system temp directory
+        }
+        
         $this->config = array_merge([
             'driver' => 'memory',
             'sqlite' => [
-                'path' => storage_path('temp/import_storage'),
+                'path' => $defaultSqlitePath,
                 'cleanup_after' => 3600
             ]
         ], $config);

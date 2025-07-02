@@ -10,17 +10,20 @@ use Crumbls\Importer\Storage\TemporaryStorageManager;
 use Crumbls\Importer\Storage\StorageReader;
 use Crumbls\Importer\Xml\XmlParser;
 use Crumbls\Importer\Xml\XmlSchema;
+use Crumbls\Importer\Contracts\BaseDriverContract;
+use Crumbls\Importer\Adapters\Traits\HasStandardDriverMethods;
+use Crumbls\Importer\Adapters\Traits\HasFileValidation;
 
-class XmlDriver implements ImporterDriverContract
+class XmlDriver implements BaseDriverContract
 {
+    use HasStandardDriverMethods, HasFileValidation {
+        HasFileValidation::getFileInfo insteadof HasStandardDriverMethods;
+    }
     protected array $config;
     protected ImportPipeline $pipeline;
     protected TemporaryStorageManager $storageManager;
-    protected string $storageDriver = 'multi_table_sqlite';
-    protected array $storageConfig = [];
     protected XmlSchema $schema;
     protected array $enabledEntities = [];
-    protected int $chunkSize = 100;
     protected ?MigrationAdapter $migrationAdapter = null;
 
     public function __construct(array $config = [])
@@ -33,6 +36,9 @@ class XmlDriver implements ImporterDriverContract
         
         $this->schema = $this->config['schema'] ?? new XmlSchema();
         $this->enabledEntities = $this->config['enabled_entities'];
+        
+        // Set XML-specific defaults
+        $this->storageDriver = 'multi_table_sqlite';
         $this->chunkSize = $this->config['chunk_size'];
         
         $this->pipeline = new ImportPipeline();
@@ -55,19 +61,11 @@ class XmlDriver implements ImporterDriverContract
         return $this->pipeline->process($source, $options);
     }
 
-    public function withTempStorage(): self
-    {
-        $this->pipeline->withTempStorage();
-        return $this;
-    }
-
     public function validate(string $source): bool
     {
-        if (!file_exists($source) || !is_readable($source)) {
-            return false;
-        }
-        
-        return $this->isValidXml($source);
+        return $this->validateFile($source) && 
+               $this->validateFileExtension($source, ['xml']) &&
+               $this->isValidXml($source);
     }
 
     public function preview(string $source, int $limit = 10): array
@@ -139,12 +137,6 @@ class XmlDriver implements ImporterDriverContract
             $this->enabledEntities[$entity] = true;
         }
         
-        return $this;
-    }
-    
-    public function chunkSize(int $size): self
-    {
-        $this->chunkSize = $size;
         return $this;
     }
     

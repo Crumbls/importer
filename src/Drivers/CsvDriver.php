@@ -2,7 +2,7 @@
 
 namespace Crumbls\Importer\Drivers;
 
-use Crumbls\Importer\Contracts\ImporterDriverContract;
+use Crumbls\Importer\Contracts\BaseDriverContract;
 use Crumbls\Importer\Contracts\ImportResult;
 use Crumbls\Importer\Pipeline\ImportPipeline;
 use Crumbls\Importer\Storage\TemporaryStorageManager;
@@ -10,9 +10,18 @@ use Crumbls\Importer\Storage\StorageReader;
 use Crumbls\Importer\Parser\StreamingCsvParser;
 use Crumbls\Importer\RateLimit\RateLimiter;
 use Crumbls\Importer\Support\DelimiterDetector;
+use Crumbls\Importer\Adapters\Traits\HasFileValidation;
+use Crumbls\Importer\Adapters\Traits\HasDataTransformation;
+use Crumbls\Importer\Adapters\Traits\HasStandardDriverMethods;
+use Crumbls\Importer\Adapters\Traits\HasLaravelGeneration;
+use Crumbls\Importer\Export\CsvExporter;
+use Crumbls\Importer\Contracts\ExportResult as ExportResultContract;
 
-class CsvDriver implements ImporterDriverContract
+class CsvDriver implements BaseDriverContract
 {
+    use HasFileValidation, HasDataTransformation, HasStandardDriverMethods {
+        HasFileValidation::getFileInfo insteadof HasStandardDriverMethods;
+    }
     protected array $config;
     protected ImportPipeline $pipeline;
     protected ?string $delimiter = null;
@@ -21,19 +30,11 @@ class CsvDriver implements ImporterDriverContract
     protected bool $hasHeaders = true;
     protected bool $autoDetectDelimiter = true;
     protected TemporaryStorageManager $storageManager;
-    protected string $storageDriver = 'memory';
-    protected array $storageConfig = [];
-    protected array $validationRules = [];
-    protected bool $skipInvalidRows = false;
-    protected int $maxErrors = 1000;
-    protected int $chunkSize = 1000;
-    protected ?RateLimiter $rateLimiter = null;
-    protected int $maxRowsPerSecond = 0;
-    protected int $maxChunksPerMinute = 0;
     protected ?array $columns = null;
     protected array $columnMapping = [];
     protected bool $autoDetectColumns = true;
     protected bool $cleanColumnNames = true;
+    protected ?ExtendedPipelineConfiguration $extendedConfig = null;
 
     public function __construct(array $config = [])
     {
@@ -91,7 +92,8 @@ class CsvDriver implements ImporterDriverContract
 
     public function validate(string $source): bool
     {
-        return file_exists($source) && is_readable($source);
+        return $this->validateFile($source) && 
+               $this->validateFileExtension($source, ['csv', 'txt', 'tsv']);
     }
 
     public function preview(string $source, int $limit = 10): array
@@ -236,103 +238,6 @@ class CsvDriver implements ImporterDriverContract
         return $this;
     }
     
-    public function skipInvalidRows(bool $skip = true): self
-    {
-        $this->skipInvalidRows = $skip;
-        return $this;
-    }
-    
-    public function maxErrors(int $maxErrors): self
-    {
-        $this->maxErrors = $maxErrors;
-        return $this;
-    }
-    
-    public function chunkSize(int $size): self
-    {
-        $this->chunkSize = $size;
-        return $this;
-    }
-    
-    public function throttle(int $maxRowsPerSecond = 0, int $maxChunksPerMinute = 0): self
-    {
-        $this->maxRowsPerSecond = $maxRowsPerSecond;
-        $this->maxChunksPerMinute = $maxChunksPerMinute;
-        
-        if ($maxRowsPerSecond > 0 || $maxChunksPerMinute > 0) {
-            $this->rateLimiter = new RateLimiter(
-                max($maxRowsPerSecond ?: 1000000, $maxChunksPerMinute ?: 1000000),
-                $maxChunksPerMinute > 0 ? 60 : 1
-            );
-        }
-        
-        return $this;
-    }
-    
-    public function maxRowsPerSecond(int $limit): self
-    {
-        return $this->throttle($limit, $this->maxChunksPerMinute);
-    }
-    
-    public function maxChunksPerMinute(int $limit): self
-    {
-        return $this->throttle($this->maxRowsPerSecond, $limit);
-    }
-    
-    public function getRateLimiterStats(): ?array
-    {
-        return $this->rateLimiter?->getStats();
-    }
-    
-    public function required(string $column): self
-    {
-        $this->addValidationRule($column, 'required', true);
-        return $this;
-    }
-    
-    public function numeric(string $column): self
-    {
-        $this->addValidationRule($column, 'numeric', true);
-        return $this;
-    }
-    
-    public function email(string $column): self
-    {
-        $this->addValidationRule($column, 'email', true);
-        return $this;
-    }
-    
-    public function minLength(string $column, int $length): self
-    {
-        $this->addValidationRule($column, 'min_length', $length);
-        return $this;
-    }
-    
-    public function maxLength(string $column, int $length): self
-    {
-        $this->addValidationRule($column, 'max_length', $length);
-        return $this;
-    }
-    
-    public function regex(string $column, string $pattern): self
-    {
-        $this->addValidationRule($column, 'regex', $pattern);
-        return $this;
-    }
-    
-    public function allowedValues(string $column, array $values): self
-    {
-        $this->addValidationRule($column, 'in', $values);
-        return $this;
-    }
-    
-    protected function addValidationRule(string $column, string $rule, $parameter): void
-    {
-        if (!isset($this->validationRules[$column])) {
-            $this->validationRules[$column] = [];
-        }
-        $this->validationRules[$column][$rule] = $parameter;
-    }
     
     protected function setupPipeline(): void
     {
@@ -384,5 +289,225 @@ class CsvDriver implements ImporterDriverContract
     protected function detectDelimiter(string $source, int $sampleSize = 1024): ?string
     {
         return DelimiterDetector::detect($source);
+    }
+    
+    /**
+     * Configure extended Laravel generation pipeline
+     */
+    public function withLaravelGeneration(ExtendedPipelineConfiguration $config = null): self
+    {
+        $this->extendedConfig = $config ?: ExtendedPipelineConfiguration::make();
+        $this->setupExtendedPipeline();
+        return $this;
+    }
+    
+    /**
+     * Quick setup for model generation
+     */
+    public function generateModel(array $options = []): self
+    {
+        $this->extendedConfig = ExtendedPipelineConfiguration::quickModel();
+        
+        if (!empty($options)) {
+            $this->extendedConfig->withModelGeneration($options);
+        }
+        
+        $this->setupExtendedPipeline();
+        return $this;
+    }
+    
+    /**
+     * Quick setup for migration generation
+     */
+    public function generateMigration(array $options = []): self
+    {
+        $this->extendedConfig = ExtendedPipelineConfiguration::quickMigration();
+        
+        if (!empty($options)) {
+            $this->extendedConfig->withMigrationGeneration($options);
+        }
+        
+        $this->setupExtendedPipeline();
+        return $this;
+    }
+    
+    /**
+     * Generate complete Laravel setup (Model + Migration + Factory + Filament)
+     */
+    public function generateLaravelStack(string $tableName = null, string $modelName = null): self
+    {
+        $this->extendedConfig = ExtendedPipelineConfiguration::fullLaravel();
+        
+        if ($tableName) {
+            $this->extendedConfig->withTableName($tableName);
+        }
+        
+        if ($modelName) {
+            $this->extendedConfig->withModelName($modelName);
+        }
+        
+        $this->setupExtendedPipeline();
+        return $this;
+    }
+    
+    /**
+     * Generate admin panel ready setup
+     */
+    public function generateAdminPanel(string $tableName = null): self
+    {
+        $this->extendedConfig = ExtendedPipelineConfiguration::adminPanel();
+        
+        if ($tableName) {
+            $this->extendedConfig->withTableName($tableName);
+        }
+        
+        $this->setupExtendedPipeline();
+        return $this;
+    }
+    
+    /**
+     * Setup extended pipeline steps
+     */
+    protected function setupExtendedPipeline(): void
+    {
+        if (!$this->extendedConfig) {
+            return;
+        }
+        
+        // Add extended steps to pipeline if enabled
+        if ($this->extendedConfig->isStepEnabled('analyze_schema')) {
+            $this->pipeline->addStep('analyze_schema');
+        }
+        
+        if ($this->extendedConfig->isStepEnabled('generate_model')) {
+            $this->pipeline->addStep('generate_model');
+        }
+        
+        if ($this->extendedConfig->isStepEnabled('generate_migration')) {
+            $this->pipeline->addStep('generate_migration');
+        }
+        
+        if ($this->extendedConfig->isStepEnabled('generate_factory')) {
+            $this->pipeline->addStep('generate_factory');
+        }
+        
+        if ($this->extendedConfig->isStepEnabled('generate_seeder')) {
+            $this->pipeline->addStep('generate_seeder');
+        }
+        
+        if ($this->extendedConfig->isStepEnabled('generate_filament_resource')) {
+            $this->pipeline->addStep('generate_filament_resource');
+        }
+        
+        if ($this->extendedConfig->isStepEnabled('run_migration')) {
+            $this->pipeline->addStep('run_migration');
+        }
+        
+        if ($this->extendedConfig->isStepEnabled('seed_data')) {
+            $this->pipeline->addStep('seed_data');
+        }
+    }
+    
+    /**
+     * Export data from storage to CSV file
+     */
+    public function exportToFile(string $destination, array $options = []): ExportResultContract
+    {
+        $reader = $this->getStorageReader();
+        if (!$reader) {
+            throw new \RuntimeException('No storage data available for export. Run import() first.');
+        }
+        
+        $exporter = new CsvExporter();
+        
+        // Configure exporter based on driver settings
+        if ($this->delimiter) {
+            $exporter->delimiter($this->delimiter);
+        }
+        if ($this->enclosure) {
+            $exporter->enclosure($this->enclosure);
+        }
+        if ($this->escape) {
+            $exporter->escape($this->escape);
+        }
+        
+        // Apply options
+        if (isset($options['headers'])) {
+            if ($options['headers'] === false) {
+                $exporter->withoutHeaders();
+            } else {
+                $exporter->withHeaders(is_array($options['headers']) ? $options['headers'] : null);
+            }
+        }
+        
+        if (isset($options['column_mapping'])) {
+            $exporter->mapColumns($options['column_mapping']);
+        }
+        
+        if (isset($options['chunk_size'])) {
+            $exporter->chunkSize($options['chunk_size']);
+        }
+        
+        if (isset($options['transformer'])) {
+            $exporter->transform($options['transformer']);
+        }
+        
+        return $exporter->exportFromStorage($reader, $destination);
+    }
+    
+    /**
+     * Export array data to CSV file
+     */
+    public function exportArray(array $data, string $destination, array $options = []): ExportResultContract
+    {
+        $exporter = new CsvExporter();
+        
+        // Configure exporter based on driver settings
+        if ($this->delimiter) {
+            $exporter->delimiter($this->delimiter);
+        }
+        if ($this->enclosure) {
+            $exporter->enclosure($this->enclosure);
+        }
+        if ($this->escape) {
+            $exporter->escape($this->escape);
+        }
+        
+        // Apply options
+        if (isset($options['headers'])) {
+            if ($options['headers'] === false) {
+                $exporter->withoutHeaders();
+            } else {
+                $exporter->withHeaders(is_array($options['headers']) ? $options['headers'] : null);
+            }
+        }
+        
+        if (isset($options['column_mapping'])) {
+            $exporter->mapColumns($options['column_mapping']);
+        }
+        
+        if (isset($options['transformer'])) {
+            $exporter->transform($options['transformer']);
+        }
+        
+        return $exporter->exportFromArray($data, $destination);
+    }
+    
+    /**
+     * Get data as array for export
+     */
+    public function toArray(): array
+    {
+        $reader = $this->getStorageReader();
+        if (!$reader) {
+            return [];
+        }
+        
+        $data = [];
+        $reader->chunk(1000, function($rows) use (&$data) {
+            $data = array_merge($data, $rows);
+        });
+        
+        return $data;
     }
 }
