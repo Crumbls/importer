@@ -3,7 +3,7 @@ name: notify
 on:
   pull_request:
     branches:
-      - master
+      - main
     types: [closed]
 
 jobs:
