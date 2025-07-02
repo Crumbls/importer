@@ -19,7 +19,7 @@ use Crumbls\Importer\Contracts\ExportResult as ExportResultContract;
 
 class CsvDriver implements BaseDriverContract
 {
-    use HasFileValidation, HasDataTransformation, HasStandardDriverMethods {
+    use HasFileValidation, HasDataTransformation, HasStandardDriverMethods, HasLaravelGeneration {
         HasFileValidation::getFileInfo insteadof HasStandardDriverMethods;
     }
     protected array $config;
@@ -34,7 +34,6 @@ class CsvDriver implements BaseDriverContract
     protected array $columnMapping = [];
     protected bool $autoDetectColumns = true;
     protected bool $cleanColumnNames = true;
-    protected ?ExtendedPipelineConfiguration $extendedConfig = null;
 
     public function __construct(array $config = [])
     {
@@ -289,123 +288,6 @@ class CsvDriver implements BaseDriverContract
     protected function detectDelimiter(string $source, int $sampleSize = 1024): ?string
     {
         return DelimiterDetector::detect($source);
-    }
-    
-    /**
-     * Configure extended Laravel generation pipeline
-     */
-    public function withLaravelGeneration(ExtendedPipelineConfiguration $config = null): self
-    {
-        $this->extendedConfig = $config ?: ExtendedPipelineConfiguration::make();
-        $this->setupExtendedPipeline();
-        return $this;
-    }
-    
-    /**
-     * Quick setup for model generation
-     */
-    public function generateModel(array $options = []): self
-    {
-        $this->extendedConfig = ExtendedPipelineConfiguration::quickModel();
-        
-        if (!empty($options)) {
-            $this->extendedConfig->withModelGeneration($options);
-        }
-        
-        $this->setupExtendedPipeline();
-        return $this;
-    }
-    
-    /**
-     * Quick setup for migration generation
-     */
-    public function generateMigration(array $options = []): self
-    {
-        $this->extendedConfig = ExtendedPipelineConfiguration::quickMigration();
-        
-        if (!empty($options)) {
-            $this->extendedConfig->withMigrationGeneration($options);
-        }
-        
-        $this->setupExtendedPipeline();
-        return $this;
-    }
-    
-    /**
-     * Generate complete Laravel setup (Model + Migration + Factory + Filament)
-     */
-    public function generateLaravelStack(string $tableName = null, string $modelName = null): self
-    {
-        $this->extendedConfig = ExtendedPipelineConfiguration::fullLaravel();
-        
-        if ($tableName) {
-            $this->extendedConfig->withTableName($tableName);
-        }
-        
-        if ($modelName) {
-            $this->extendedConfig->withModelName($modelName);
-        }
-        
-        $this->setupExtendedPipeline();
-        return $this;
-    }
-    
-    /**
-     * Generate admin panel ready setup
-     */
-    public function generateAdminPanel(string $tableName = null): self
-    {
-        $this->extendedConfig = ExtendedPipelineConfiguration::adminPanel();
-        
-        if ($tableName) {
-            $this->extendedConfig->withTableName($tableName);
-        }
-        
-        $this->setupExtendedPipeline();
-        return $this;
-    }
-    
-    /**
-     * Setup extended pipeline steps
-     */
-    protected function setupExtendedPipeline(): void
-    {
-        if (!$this->extendedConfig) {
-            return;
-        }
-        
-        // Add extended steps to pipeline if enabled
-        if ($this->extendedConfig->isStepEnabled('analyze_schema')) {
-            $this->pipeline->addStep('analyze_schema');
-        }
-        
-        if ($this->extendedConfig->isStepEnabled('generate_model')) {
-            $this->pipeline->addStep('generate_model');
-        }
-        
-        if ($this->extendedConfig->isStepEnabled('generate_migration')) {
-            $this->pipeline->addStep('generate_migration');
-        }
-        
-        if ($this->extendedConfig->isStepEnabled('generate_factory')) {
-            $this->pipeline->addStep('generate_factory');
-        }
-        
-        if ($this->extendedConfig->isStepEnabled('generate_seeder')) {
-            $this->pipeline->addStep('generate_seeder');
-        }
-        
-        if ($this->extendedConfig->isStepEnabled('generate_filament_resource')) {
-            $this->pipeline->addStep('generate_filament_resource');
-        }
-        
-        if ($this->extendedConfig->isStepEnabled('run_migration')) {
-            $this->pipeline->addStep('run_migration');
-        }
-        
-        if ($this->extendedConfig->isStepEnabled('seed_data')) {
-            $this->pipeline->addStep('seed_data');
-        }
     }
     
     /**

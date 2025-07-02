@@ -1,0 +1,31 @@
+parameters:
+    level: 4
+    paths:
+        - src
+    
+    # Ignore specific directories/files during development
+    excludePaths:
+        - src/Testing/*
+        - tests/*
+        - examples/*
+        - development-tests/*
+    
+    # Treat these as internal Laravel classes
+    ignoreErrors:
+        # Laravel Facade calls
+        - '#Call to an undefined static method Illuminate\\Support\\Facades#'
+        
+        # Laravel helpers that PHPStan doesn't understand
+        - '#Function (app|config|storage_path) not found#'
+        
+        # Dynamic property access in Laravel models
+        - '#Access to an undefined property [a-zA-Z0-9\\_]+::\$[a-zA-Z0-9_]+#'
+        
+        # Array access on mixed
+        - '#Cannot access offset .* on mixed#'
+        
+        # Mixed return types in Laravel
+        - '#Method .* should return .* but returns mixed#'
+        
+        # Undefined array keys
+        - '#Offset .* does not exist on array#'

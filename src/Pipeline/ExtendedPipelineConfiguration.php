@@ -303,4 +303,66 @@ class ExtendedPipelineConfiguration
             ->withFilamentGeneration()
             ->withAutoExecution();
     }
+    
+    // WordPress-specific preset configurations
+    public static function completeApplication(): self
+    {
+        return static::make()->withCompleteGeneration()->withAutoExecution();
+    }
+    
+    public static function contentManagement(): self
+    {
+        return static::make()
+            ->withModelGeneration()
+            ->withMigrationGeneration()
+            ->withFilamentGeneration();
+    }
+    
+    public static function userManagement(): self
+    {
+        return static::make()
+            ->withModelGeneration()
+            ->withMigrationGeneration()
+            ->withFilamentGeneration();
+    }
+    
+    public static function modelsOnly(): self
+    {
+        return static::make()
+            ->withModelGeneration()
+            ->withMigrationGeneration()
+            ->withFactoryGeneration();
+    }
+    
+    // Multi-model configuration methods
+    public function withMultipleModels(array $models): self
+    {
+        $this->config['multiple_models'] = $models;
+        return $this;
+    }
+    
+    public function withRelationships(array $relationships): self
+    {
+        $this->config['relationships'] = $relationships;
+        return $this;
+    }
+    
+    public function withFilamentResources(array $resources): self
+    {
+        $this->config['filament_resources'] = $resources;
+        $this->withFilamentGeneration();
+        return $this;
+    }
+    
+    public function withAdvancedFactories(array $factories): self
+    {
+        $this->config['advanced_factories'] = $factories;
+        $this->withFactoryGeneration();
+        return $this;
+    }
+    
+    public function get(string $key, $default = null)
+    {
+        return data_get($this->config, $key, $default);
+    }
 }

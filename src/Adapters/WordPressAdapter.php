@@ -8,6 +8,7 @@ use Crumbls\Importer\Adapters\Traits\HasStrategy;
 use Crumbls\Importer\Adapters\Traits\HasDatabaseOperations;
 use Crumbls\Importer\Adapters\Traits\HasMigrationLogging;
 use Crumbls\Importer\Adapters\Traits\HasPerformanceMonitoring;
+use Crumbls\Importer\Adapters\Traits\HasLaravelGeneration;
 use Crumbls\Importer\Contracts\MigrationAdapter;
 use Crumbls\Importer\Contracts\MigrationPlan;
 use Crumbls\Importer\Contracts\ValidationResult;
@@ -15,6 +16,7 @@ use Crumbls\Importer\Contracts\DryRunResult;
 use Crumbls\Importer\Contracts\MigrationResult;
 use Crumbls\Importer\Contracts\AdapterConfiguration;
 use Crumbls\Importer\Configuration\MigrationConfiguration;
+use Crumbls\Importer\Pipeline\ExtendedPipelineConfiguration;
 use Illuminate\Database\Capsule\Manager as DB;
 use Illuminate\Database\Schema\Blueprint;
 
@@ -25,7 +27,8 @@ class WordPressAdapter implements MigrationAdapter
 		HasStrategy,
 		HasDatabaseOperations,
 		HasMigrationLogging,
-		HasPerformanceMonitoring;
+		HasPerformanceMonitoring,
+		HasLaravelGeneration;
 
     public function __construct(mixed $config = [], string $environment = 'production')
     {
@@ -763,5 +766,90 @@ class WordPressAdapter implements MigrationAdapter
         return $this->config('check_conflicts_during_planning', false);
     }
     
+    /**
+     * Generate complete Laravel application from WordPress XML data
+     * This creates models for all WordPress entities (posts, users, comments, etc.)
+     */
+    public function generateCompleteWordPressApplication(): self
+    {
+        $this->extendedConfig = ExtendedPipelineConfiguration::completeApplication()
+            ->withMultipleModels([
+                'posts' => 'Post',
+                'users' => 'User', 
+                'comments' => 'Comment',
+                'postmeta' => 'PostMeta',
+                'terms' => 'Term',
+                'categories' => 'Category',
+                'tags' => 'Tag'
+            ])
+            ->withRelationships([
+                'Post' => ['hasMany' => ['Comment', 'PostMeta'], 'belongsTo' => ['User']],
+                'User' => ['hasMany' => ['Post', 'Comment']],
+                'Comment' => ['belongsTo' => ['Post', 'User']],
+                'PostMeta' => ['belongsTo' => ['Post']],
+                'Term' => ['belongsToMany' => ['Post']],
+                'Category' => ['belongsToMany' => ['Post']],
+                'Tag' => ['belongsToMany' => ['Post']]
+            ]);
+            
+        $this->setupExtendedPipeline();
+        return $this;
+    }
+    
+    /**
+     * Generate Laravel application focused on WordPress content (posts + metadata)
+     */
+    public function generateContentManagementSystem(): self
+    {
+        $this->extendedConfig = ExtendedPipelineConfiguration::contentManagement()
+            ->withMultipleModels([
+                'posts' => 'Post',
+                'postmeta' => 'PostMeta',
+                'terms' => 'Term',
+                'categories' => 'Category',
+                'tags' => 'Tag'
+            ])
+            ->withFilamentResources(['Post', 'Category', 'Tag'])
+            ->withAdvancedFactories(['Post' => 'rich_content']);
+            
+        $this->setupExtendedPipeline();
+        return $this;
+    }
+    
+    /**
+     * Generate Laravel application for WordPress user management
+     */
+    public function generateUserManagementSystem(): self
+    {
+        $this->extendedConfig = ExtendedPipelineConfiguration::userManagement()
+            ->withMultipleModels([
+                'users' => 'User',
+                'usermeta' => 'UserMeta'
+            ])
+            ->withFilamentResources(['User'])
+            ->withAdvancedFactories(['User' => 'realistic_profiles']);
+            
+        $this->setupExtendedPipeline();
+        return $this;
+    }
+    
+    /**
+     * Generate Laravel models for WordPress content without admin interface
+     */
+    public function generateWordPressModels(): self
+    {
+        $this->extendedConfig = ExtendedPipelineConfiguration::modelsOnly()
+            ->withMultipleModels([
+                'posts' => 'Post',
+                'users' => 'User',
+                'comments' => 'Comment',
+                'postmeta' => 'PostMeta',
+                'usermeta' => 'UserMeta',
+                'terms' => 'Term'
+            ]);
+            
+        $this->setupExtendedPipeline();
+        return $this;
+    }
 
 }
