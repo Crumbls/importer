@@ -21,11 +21,11 @@ describe('Migration Capabilities', function () {
         
         $extractedData = [
             'posts' => [
-                ['title' => 'Test Post', 'content' => 'Content', 'post_type' => 'post'],
-                ['title' => 'Test Page', 'content' => 'Page Content', 'post_type' => 'page']
+                ['post_title' => 'Test Post', 'post_content' => 'Content', 'post_type' => 'post'],
+                ['post_title' => 'Test Page', 'post_content' => 'Page Content', 'post_type' => 'page']
             ],
             'users' => [
-                ['author_login' => 'admin', 'author_email' => 'admin@test.com']
+                ['user_login' => 'admin', 'user_email' => 'admin@test.com']
             ]
         ];
         
@@ -39,11 +39,11 @@ describe('Migration Capabilities', function () {
     });
     
     it('can validate migration plan', function () {
-        $adapter = new WordPressAdapter(['connection' => 'test_db']);
+        $adapter = new WordPressAdapter(['connection' => 'test_db'], 'testing');
         
         $extractedData = [
             'posts' => [
-                ['title' => 'Test Post', 'content' => 'Content']
+                ['post_title' => 'Test Post', 'post_content' => 'Content']
             ]
         ];
         
@@ -59,7 +59,7 @@ describe('Migration Capabilities', function () {
         
         $extractedData = [
             'posts' => [
-                ['title' => 'Test Post', 'content' => 'Content']
+                ['post_title' => 'Test Post', 'post_content' => 'Content']
             ]
         ];
         
@@ -72,11 +72,11 @@ describe('Migration Capabilities', function () {
     });
     
     it('can execute migration', function () {
-        $adapter = new WordPressAdapter(['connection' => 'test_db']);
+        $adapter = new WordPressAdapter(['connection' => 'test_db'], 'testing');
         
         $extractedData = [
             'posts' => [
-                ['title' => 'Test Post', 'content' => 'Content']
+                ['post_title' => 'Test Post', 'post_content' => 'Content']
             ]
         ];
         

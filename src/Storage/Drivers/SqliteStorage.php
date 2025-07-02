@@ -57,7 +57,11 @@ class SqliteStorage implements TemporaryStorageContract
             $stmt = $this->connection->prepare($sql);
             return $stmt->execute(array_values($row));
             
+        } catch (\PDOException $e) {
+            error_log("SQLite insert failed: " . $e->getMessage());
+            return false;
         } catch (\Exception $e) {
+            error_log("Unexpected error during SQLite insert: " . $e->getMessage());
             return false;
         }
     }
@@ -86,10 +90,17 @@ class SqliteStorage implements TemporaryStorageContract
             $this->connection->commit();
             return $inserted;
             
+        } catch (\PDOException $e) {
+            if ($this->connection) {
+                $this->connection->rollBack();
+            }
+            error_log("SQLite batch insert failed: " . $e->getMessage());
+            return 0;
         } catch (\Exception $e) {
             if ($this->connection) {
                 $this->connection->rollBack();
             }
+            error_log("Unexpected error during SQLite batch insert: " . $e->getMessage());
             return 0;
         }
     }

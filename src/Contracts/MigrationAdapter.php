@@ -30,12 +30,22 @@ interface MigrationAdapter
     public function rollback(string $migrationId): bool;
     
     /**
-     * Get the adapter's configuration
+     * Get the adapter's configuration object
+     */
+    public function getConfiguration(): AdapterConfiguration;
+    
+    /**
+     * Set configuration for the adapter
+     */
+    public function setConfiguration(AdapterConfiguration $configuration): self;
+    
+    /**
+     * Get the adapter's configuration as array (backwards compatibility)
      */
     public function getConfig(): array;
     
     /**
-     * Set configuration for the adapter
+     * Set configuration from array (backwards compatibility)
      */
     public function setConfig(array $config): self;
 }

@@ -3,6 +3,7 @@
 namespace Crumbls\Importer\Pipeline;
 
 use Crumbls\Importer\Contracts\ImportResult;
+use Crumbls\Importer\Support\DelimiterDetector;
 
 class ImportPipeline
 {
@@ -120,9 +121,6 @@ class ImportPipeline
         ], false); // Don't merge - this is a fresh start
 
         return $this->executeSteps($source, $options);
-
-        $this->markCompleted();
-        return $result;
     }
 
     protected function resumeFromState(): ImportResult
@@ -935,35 +933,7 @@ class ImportPipeline
     
     protected function detectDelimiter(string $source, int $sampleSize = 1024): ?string
     {
-        $delimiters = [',', ';', "\t", '|', ':'];
-        $handle = fopen($source, 'r');
-        
-        if (!$handle) {
-            return null;
-        }
-        
-        $sample = fread($handle, $sampleSize);
-        fclose($handle);
-        
-        if (!$sample) {
-            return null;
-        }
-        
-        $delimiterCounts = [];
-        
-        foreach ($delimiters as $delimiter) {
-            $count = substr_count($sample, $delimiter);
-            if ($count > 0) {
-                $delimiterCounts[$delimiter] = $count;
-            }
-        }
-        
-        if (empty($delimiterCounts)) {
-            return null;
-        }
-        
-        arsort($delimiterCounts);
-        return array_key_first($delimiterCounts);
+        return DelimiterDetector::detect($source);
     }
     
     protected function processHeaders(array $rawHeaders, array $driverConfig): array

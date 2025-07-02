@@ -9,6 +9,7 @@ use Crumbls\Importer\Storage\TemporaryStorageManager;
 use Crumbls\Importer\Storage\StorageReader;
 use Crumbls\Importer\Parser\StreamingCsvParser;
 use Crumbls\Importer\RateLimit\RateLimiter;
+use Crumbls\Importer\Support\DelimiterDetector;
 
 class CsvDriver implements ImporterDriverContract
 {
@@ -134,9 +135,20 @@ class CsvDriver implements ImporterDriverContract
             
             return $preview;
             
+        } catch (\InvalidArgumentException $e) {
+            return [
+                'error' => 'Invalid CSV format: ' . $e->getMessage(),
+                'error_type' => 'validation'
+            ];
+        } catch (\RuntimeException $e) {
+            return [
+                'error' => 'Cannot read CSV file: ' . $e->getMessage(),
+                'error_type' => 'file_access'
+            ];
         } catch (\Exception $e) {
             return [
-                'error' => 'Failed to preview CSV: ' . $e->getMessage()
+                'error' => 'Failed to preview CSV: ' . $e->getMessage(),
+                'error_type' => 'unexpected'
             ];
         }
     }
@@ -371,34 +383,6 @@ class CsvDriver implements ImporterDriverContract
     
     protected function detectDelimiter(string $source, int $sampleSize = 1024): ?string
     {
-        $delimiters = [',', ';', "\t", '|', ':'];
-        $handle = fopen($source, 'r');
-        
-        if (!$handle) {
-            return null;
-        }
-        
-        $sample = fread($handle, $sampleSize);
-        fclose($handle);
-        
-        if (!$sample) {
-            return null;
-        }
-        
-        $delimiterCounts = [];
-        
-        foreach ($delimiters as $delimiter) {
-            $count = substr_count($sample, $delimiter);
-            if ($count > 0) {
-                $delimiterCounts[$delimiter] = $count;
-            }
-        }
-        
-        if (empty($delimiterCounts)) {
-            return null;
-        }
-        
-        arsort($delimiterCounts);
-        return array_key_first($delimiterCounts);
+        return DelimiterDetector::detect($source);
     }
 }

@@ -33,7 +33,7 @@
 - Example and test scaffolding are present, but features are incomplete.
 - Please see Discord for updates and discussion.
 
-A Laravel package for importing data from remote sources.
+A Laravel package for importing data from remote sources with production-ready reliability, scalability, and Laravel-native architecture patterns.
 
 ## Installation
 
@@ -49,7 +49,33 @@ Publish the config file:
 php artisan vendor:publish --provider="Crumbls\Importer\ImporterServiceProvider" --tag="config"
 ```
 
+## Architecture
+
+### Laravel-Native Design
+
+This package is built using Laravel's native patterns and components:
+
+- **Database Operations**: Uses Laravel's Database Capsule Manager and Schema Builder instead of raw SQL
+- **Configuration**: Leverages Laravel's config system with dot-notation access and environment awareness
+- **Service Provider**: Standard Laravel service provider pattern for registration and bootstrapping
+- **Manager Pattern**: Follows Laravel's Manager pattern for driver creation and management
+- **Eloquent-Style Fluent API**: Method chaining similar to Laravel Query Builder
+- **Validation**: Laravel-compatible validation rules and error handling
+- **Facades**: Laravel facade pattern for convenient static access
+
+### Core Components
+
+- **ImporterManager**: Laravel Manager that creates driver instances (CSV, XML, WPXML, future drivers)
+- **ImportPipeline**: Stateful pipeline that can pause/resume operations and handle large files
+- **Drivers**: Individual import drivers with fluent APIs (CsvDriver, XmlDriver, WpxmlDriver)
+- **StreamingParser**: Memory-efficient parsers for processing large files
+- **Storage System**: Multiple backends (in-memory, SQLite) for temporary data storage
+- **Configuration System**: Standardized, environment-aware configuration management
+- **Migration Adapters**: Database migration tools with conflict resolution strategies
+
 ## Usage
+
+### Basic Import
 
 ```php
 use Crumbls\Importer\ImporterManager;
@@ -59,25 +85,123 @@ $importer = app(ImporterManager::class);
 // Basic CSV import
 $result = $importer->driver('csv')->import('/path/to/file.csv');
 
-// Import with temporary storage for large files
-$result = $importer->driver('csv')
-    ->import('/path/to/file.csv');
-
-// Preview data
-$preview = $importer->driver('csv')->preview('/path/to/file.csv', 5);
+// WordPress XML import
+$result = $importer->driver('wpxml')->import('/path/to/export.xml');
 ```
 
-## Memory Efficiency
+### Advanced Configuration
 
-Designed for handling massive CSV files:
-- Pipeline can be stopped/resumed at any point
-- Streaming file reading to avoid memory limits
-- Chunked database operations for large datasets
-- Temporary storage for processing huge files
+```php
+// CSV import with full configuration
+$result = $importer->driver('csv')
+    ->delimiter(',')
+    ->withHeaders()
+    ->columns(['name', 'email', 'age'])
+    ->required('email')
+    ->numeric('age')
+    ->chunkSize(1000)
+    ->throttle(500) // max 500 rows per second
+    ->withTempStorage()
+    ->import('/path/to/large-file.csv');
 
-## Pipeline Pattern
+// Column mapping and cleaning
+$result = $importer->driver('csv')
+    ->mapColumn('Full Name', 'name')
+    ->mapColumn('Email Address', 'email')
+    ->cleanColumnNames() // auto snake_case conversion
+    ->import('/path/to/file.csv');
+```
 
-Each driver uses a consistent pipeline pattern that can be extended with custom steps. The pipeline maintains context between steps and can be configured to handle different processing requirements.
+### WordPress Migration
+
+```php
+use Crumbls\Importer\Adapters\WordPressAdapter;
+
+// Configure WordPress migration
+$adapter = new WordPressAdapter([
+    'connection' => [
+        'host' => 'localhost',
+        'database' => 'target_wp_db',
+        'username' => 'user',
+        'password' => 'pass'
+    ],
+    'conflict_resolution' => 'update',
+    'dry_run' => false
+], 'production');
+
+// Import with migration
+$result = $importer->driver('wpxml')
+    ->withMigrationAdapter($adapter)
+    ->import('/path/to/wordpress-export.xml');
+```
+
+### Error Handling
+
+```php
+try {
+    $result = $importer->driver('csv')->import('/path/to/file.csv');
+    
+    if ($result->hasErrors()) {
+        foreach ($result->getErrors() as $error) {
+            Log::error('Import error', $error);
+        }
+    }
+} catch (\Crumbls\Importer\Exceptions\ValidationException $e) {
+    // Handle validation errors
+} catch (\Crumbls\Importer\Exceptions\MemoryException $e) {
+    // Handle memory limit issues
+} catch (\Crumbls\Importer\Exceptions\ConnectionException $e) {
+    // Handle database/network issues
+}
+```
+
+## Key Features
+
+### Memory Efficiency
+- Streams large files without loading entire content into memory
+- Chunked processing with configurable batch sizes
+- Automatic memory monitoring and limit enforcement
+- Temporary storage options (in-memory or SQLite)
+
+### Resumable Operations
+- Pipeline state management with automatic checkpointing
+- Resume interrupted imports from last successful state
+- File modification detection to prevent stale resumes
+
+### Rate Limiting
+- Configurable throttling for processing speed
+- Per-second and per-minute rate limits
+- Built-in rate limiter with statistics tracking
+
+### Validation & Error Handling
+- Column-level validation rules with Laravel-compatible syntax
+- Comprehensive error categorization and recovery
+- Detailed error reporting with context information
+- Skip invalid rows option for fault tolerance
+
+### Laravel Integration
+- Native Laravel service provider registration
+- Config system integration with environment support
+- Database operations using Laravel's Schema Builder
+- Fluent API design consistent with Laravel patterns
+
+## Testing
+
+```bash
+# Run all tests
+./vendor/bin/pest
+
+# Run specific test suites
+./vendor/bin/pest tests/Unit
+./vendor/bin/pest tests/Feature
+
+# Run with coverage
+./vendor/bin/pest --coverage
+```
+
+## Development Commands
+
+See `CLAUDE.md` for detailed development commands and architecture information.
 
 ## License
 
