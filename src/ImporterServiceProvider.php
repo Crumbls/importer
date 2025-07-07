@@ -2,10 +2,13 @@
 
 namespace Crumbls\Importer;
 
+use Crumbls\Importer\Events\StorageServiceInitialized;
+use Crumbls\Importer\Listeners\RegisterStorageDrivers;
 use Crumbls\Importer\Services\ImportService;
 use Crumbls\Importer\Console\ImporterCommand;
 use Crumbls\Importer\Events\ImportServiceInitialized;
 use Crumbls\Importer\Listeners\RegisterImportDrivers;
+use Crumbls\Importer\Services\StorageService;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
 
@@ -36,6 +39,7 @@ class ImporterServiceProvider extends ServiceProvider
 
         // Register event listener for driver registration
         Event::listen(ImportServiceInitialized::class, RegisterImportDrivers::class);
+		Event::listen(StorageServiceInitialized::class, RegisterStorageDrivers::class);
     }
 
     public function register()
@@ -44,10 +48,17 @@ class ImporterServiceProvider extends ServiceProvider
             __DIR__.'/../config/importer.php', 'importer'
         );
 
-        $this->app->singleton(ImportService::class, function ($app) {
-            return new ImportService($app);
-        });
+	    $this->app->singleton(ImportService::class, function ($app) {
+		    return new ImportService($app);
+	    });
 
-        $this->app->alias(ImportService::class, 'importer');
+	    $this->app->alias(ImportService::class, 'importer');
+
+
+	    $this->app->singleton(StorageService::class, function ($app) {
+		    return new StorageService($app);
+	    });
+
+	    $this->app->alias(StorageService::class, 'importer-storage');
     }
 }

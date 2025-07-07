@@ -4,6 +4,7 @@ namespace Crumbls\Importer\Models;
 
 use Crumbls\Importer\Drivers\Contracts\DriverContract;
 use Crumbls\Importer\Drivers\AutoDriver;
+use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\StateMachine\Traits\HasStateMachine;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -58,6 +59,15 @@ class Import extends Model implements ImportContract
 						$record->state = $config->getDefaultState();
 					}
 				}
+			}
+		});
+
+		static::deleting(function(ImportContract $record) {
+			$metadata = $record->metadata ?? [];
+			if (isset($metadata['storage_driver'])) {
+				$storage = Storage::driver($metadata['storage_driver'])
+					->configureFromMetadata($metadata);
+				$storage->deleteStore();
 			}
 		});
 	}

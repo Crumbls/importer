@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\States;
 
+use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -17,73 +18,64 @@ class CreateStorageState extends AbstractState
             throw new \RuntimeException('Import contract not found in context');
         }
 
-        try {
-            $sqliteDbPath = $this->getSqliteDbPath($import);
+		$metadata = $import->metadata ?? [];
+		$updated = false;
 
-            $connectionName = $this->setupSqliteConnection($sqliteDbPath);
+		if (!isset($metadata['storage_driver']) || !$metadata['storage_driver']) {
+			$metadata['storage_driver'] = Storage::getDefaultDriver();
+		}
 
-            $import->update([
-                'state' => static::class,
-                'metadata' => array_merge($import->metadata ?? [], [
-                    'sqlite_db_path' => $sqliteDbPath,
-                    'sqlite_connection' => $connectionName,
-                    'storage_created_at' => now()->toISOString(),
-                ])
-            ]);
+	    if (!isset($metadata['storage_connection']) || !$metadata['storage_connection']) {
+		    $metadata['storage_connection'] = 'import_' . uniqid();
+		    $updated = true;
+	    }
 
-        } catch (\Exception $e) {
-	        /**
-	         * TODO: Not all states have a FailedState, so throw an exception instead.
-	         */
-            $import->update([
-                'state' => FailedState::class,
-                'error_message' => $e->getMessage(),
-                'failed_at' => now(),
-            ]);
-            throw $e;
-        }
-    }
+	    if (!isset($metadata['storage_path']) || !$metadata['storage_path']) {
+			$storeName = $this->getStoreName($import);
 
-    private function getSqliteDbPath(ImportContract $import): string
-    {
-        $sqliteDbPath = storage_path("app/imports/wp_import_{$import->getKey()}.sqlite");
-        
-        $directory = dirname($sqliteDbPath);
+			$storage = Storage::driver($metadata['storage_driver'])
+				->createOrFindStore($storeName);
 
-        if (!is_dir($directory)) {
-            mkdir($directory, 0755, true);
-        }
+			$metadata['storage_path'] = $storage->getStorePath();
+			$metadata['storage_created_at'] = now()->toISOString();
+			$updated = true;
+		}
 
-        return $sqliteDbPath;
-    }
+		$sqliteDbPath = $metadata['storage_path'];
+		$connectionName = $metadata['storage_connection'];
 
-    private function setupSqliteConnection(string $sqliteDbPath): string
-    {
-        $connectionName = 'import_' . uniqid();
-        
-        // Ensure SQLite file exists
-        if (!file_exists($sqliteDbPath)) {
-            touch($sqliteDbPath);
-        }
-        
-        // Add SQLite connection to Laravel's database config
-        config([
-            "database.connections.{$connectionName}" => [
-                'driver' => 'sqlite',
-                'database' => $sqliteDbPath,
-                'prefix' => '',
-                'foreign_key_constraints' => true,
-            ]
-        ]);
+	    // Ensure SQLite file exists
+	    if (!file_exists($sqliteDbPath)) {
+		    touch($sqliteDbPath);
+	    }
 
-        try {
-            DB::connection($connectionName)->statement('CREATE TABLE IF NOT EXISTS connection_test (id INTEGER)');
-            DB::connection($connectionName)->statement('DROP TABLE connection_test');
-        } catch (\Exception $e) {
-            throw new \RuntimeException("Failed to establish SQLite connection: " . $e->getMessage());
-        }
-        
-        return $connectionName;
-    }
+	    // Add SQLite connection to Laravel's database config
+	    config([
+		    "database.connections.{$connectionName}" => [
+			    'driver' => 'sqlite',
+			    'database' => $sqliteDbPath,
+			    'prefix' => '',
+			    'foreign_key_constraints' => true,
+		    ]
+	    ]);
+
+		if ($updated) {
+			$import->update([
+				'state' => static::class,
+				'metadata' => $metadata
+			]);
+		} else {
+			$import->update([
+				'state' => static::class
+			]);
+		}
+
+		DB::connection($connectionName)->statement('CREATE TABLE IF NOT EXISTS connection_test (id INTEGER)');
+		DB::connection($connectionName)->statement('DROP TABLE connection_test');
+	}
+
+	private function getStoreName(ImportContract $import): string {
+		return "import_{$import->getKey()}";
+	}
 
 }

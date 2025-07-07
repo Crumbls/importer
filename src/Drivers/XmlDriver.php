@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\Drivers;
 
+use Exception;
 use Crumbls\Importer\Drivers\Contracts\DriverContract;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Models\Import;
@@ -11,6 +12,7 @@ use Crumbls\Importer\States\CompletedState;
 use Crumbls\Importer\States\FailedState;
 use Crumbls\Importer\States\InitializingState;
 use Crumbls\Importer\States\PendingState;
+use Crumbls\Importer\Support\DriverConfig;
 use Crumbls\StateMachine\Examples\PendingPayment;
 use Crumbls\StateMachine\State;
 use Crumbls\StateMachine\StateConfig;
@@ -30,7 +32,7 @@ class XmlDriver extends AbstractDriver
 	 * @return bool
 	 */
 	public static function canHandle(ImportContract $import) : bool {
-		if (!preg_match('#^file::#', $import->source_type)) {
+		if (!preg_match('#^(file|disk)::#', $import->source_type)) {
 			return false;
 		}
 		return preg_match('#\.xml$#', $import->source_detail);
@@ -41,9 +43,10 @@ class XmlDriver extends AbstractDriver
 		return WpXmlDriver::getPriority() + 10;
 	}
 
-	public static function config(): StateConfig
+	public static function config(): DriverConfig
 	{
-		return parent::config()
+		throw new Exception('Not defined!');
+		return (new DriverConfig())
 			->default(PendingState::class)
 			->allowTransition(PendingState::class, AnalyzingState::class)
 			->allowTransition(AnalyzingState::class, FailedState::class)
