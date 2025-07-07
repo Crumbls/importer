@@ -13,10 +13,3 @@ uses(Crumbls\Importer\Tests\TestCase::class)->in('Feature', 'Unit');
 | fluent expectations, helper functions, and datasets for testing imports.
 |
 */
-
-// Autoload the testing helpers
-require_once __DIR__ . '/../src/Testing/ImporterTestCase.php';
-require_once __DIR__ . '/../src/Testing/TestFixtures.php';
-require_once __DIR__ . '/../src/Testing/MockDriver.php';
-require_once __DIR__ . '/../src/Testing/AssertionHelpers.php';
-require_once __DIR__ . '/../src/Testing/PestHelpers.php';

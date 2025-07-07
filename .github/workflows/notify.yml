@@ -19,4 +19,4 @@ jobs:
           webhook_token: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
           color: "#48f442"
           username: "The Lab Bot"
-          message: "🎉 New update on master !\n\n**${{ github.event.pull_request.title }}**\n\n${{ github.event.pull_request.body }}."
+          message: "🎉 There is an update to the importer package!\n\n**${{ github.event.pull_request.title }}**\n\n${{ github.event.pull_request.body }}."

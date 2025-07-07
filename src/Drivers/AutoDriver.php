@@ -11,6 +11,7 @@ use Crumbls\Importer\States\CompletedState;
 use Crumbls\Importer\States\FailedState;
 use Crumbls\Importer\States\InitializingState;
 use Crumbls\Importer\States\PendingState;
+use Crumbls\Importer\Support\DriverConfig;
 use Crumbls\StateMachine\Examples\PendingPayment;
 use Crumbls\StateMachine\State;
 use Crumbls\StateMachine\StateConfig;
@@ -22,32 +23,36 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Http\Client\PendingRequest;
 
-class XmlDriver extends AbstractDriver
+class AutoDriver extends AbstractDriver
 {
+	protected array $source = [];
 
 	/**
+	 * Set to false so we never auto attempt this. It's whole job is to find the correct driver.
 	 * @param ImportContract $import
 	 * @return bool
 	 */
 	public static function canHandle(ImportContract $import) : bool {
-		if (!preg_match('#^file::#', $import->source_type)) {
-			return false;
-		}
-		return preg_match('#\.xml$#', $import->source_detail);
+		return false;
 	}
 
 	public static function getPriority() : int
 	{
-		return WpXmlDriver::getPriority() + 10;
+		return 10;
 	}
 
-	public static function config(): StateConfig
+
+	public static function config(): DriverConfig
 	{
-		return parent::config()
+		return (new DriverConfig())
 			->default(PendingState::class)
+
 			->allowTransition(PendingState::class, AnalyzingState::class)
 			->allowTransition(AnalyzingState::class, FailedState::class)
-			->allowTransition(AnalyzingState::class, CompletedState::class)
-;
+//			->allowTransition(AnalyzingState::class, CompletedState::class)
+
+			->preferredTransition(PendingState::class, AnalyzingState::class)
+//			->preferredTransition(AnalyzingState::class, CompletedState::class)
+			;
 	}
 }

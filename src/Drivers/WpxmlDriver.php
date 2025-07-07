@@ -2,140 +2,85 @@
 
 namespace Crumbls\Importer\Drivers;
 
-use Crumbls\Importer\Xml\XmlSchema;
+use Crumbls\Importer\Drivers\Contracts\DriverContract;
+use Crumbls\Importer\Models\Contracts\ImportContract;
+use Crumbls\Importer\Models\Import;
+use Crumbls\Importer\States\CreateStorageState;
 
-class WpxmlDriver extends XmlDriver
+use Crumbls\Importer\States\ProcessingState;
+
+use Crumbls\Importer\States\CancelledState;
+use Crumbls\Importer\States\CompletedState;
+use Crumbls\Importer\States\FailedState;
+use Crumbls\Importer\States\InitializingState;
+use Crumbls\Importer\States\PendingState;
+use Crumbls\StateMachine\Examples\PendingPayment;
+use Crumbls\StateMachine\State;
+use Crumbls\StateMachine\StateConfig;
+use Crumbls\Importer\Support\DriverConfig;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Database\DatabaseManager;
+use Illuminate\Http\Client\PendingRequest;
+
+class WpXmlDriver extends XmlDriver
 {
-    public function __construct(array $config = [])
-    {
-        // Extract everything by default for migrations
-        $defaultEntities = [
-            'posts' => true,
-            'postmeta' => true,
-            'attachments' => true,
-            'users' => true,
-            'comments' => true,
-            'commentmeta' => true,
-            'terms' => true,
-            'categories' => true,
-            'tags' => true
-        ];
-        
-        $wpConfig = array_merge([
-            'schema' => XmlSchema::wordpress(),
-            'enabled_entities' => array_merge($defaultEntities, $config['enabled_entities'] ?? []),
-            'chunk_size' => $config['chunk_size'] ?? 100
-        ], $config);
-        
-        parent::__construct($wpConfig);
-    }
+	public static function getPriority() : int
+	{
+		return 90;
+	}
+	/**
+	 * @param ImportContract $import
+	 * @return bool
+	 */
+	public static function canHandle(ImportContract $import) : bool {
+		// First check if it's a valid XML file
+		if (!XmlDriver::canHandle($import)) {
+			return false;
+		}
 
-    public function validate(string $source): bool
-    {
-        if (!file_exists($source) || !is_readable($source)) {
-            return false;
-        }
-        
-        return $this->isWordPressXml($source);
-    }
-    
-    // WordPress-specific fluent methods for all entities
-    public function extractPosts(bool $extract = true): self
-    {
-        return $this->enableEntity('posts', $extract);
-    }
-    
-    public function extractPostMeta(bool $extract = true): self
-    {
-        return $this->enableEntity('postmeta', $extract);
-    }
-    
-    public function extractAttachments(bool $extract = true): self
-    {
-        return $this->enableEntity('attachments', $extract);
-    }
-    
-    public function extractUsers(bool $extract = true): self
-    {
-        return $this->enableEntity('users', $extract);
-    }
-    
-    public function extractComments(bool $extract = true): self
-    {
-        return $this->enableEntity('comments', $extract);
-    }
-    
-    public function extractCommentMeta(bool $extract = true): self
-    {
-        return $this->enableEntity('commentmeta', $extract);
-    }
-    
-    public function extractTerms(bool $extract = true): self
-    {
-        return $this->enableEntity('terms', $extract);
-    }
-    
-    public function extractCategories(bool $extract = true): self
-    {
-        return $this->enableEntity('categories', $extract);
-    }
-    
-    public function extractTags(bool $extract = true): self
-    {
-        return $this->enableEntity('tags', $extract);
-    }
-    
-    // Convenience methods for common filtering
-    public function onlyPosts(): self
-    {
-        return $this->onlyEntities(['posts', 'postmeta']);
-    }
-    
-    public function onlyContent(): self
-    {
-        return $this->onlyEntities(['posts', 'postmeta', 'attachments', 'categories', 'tags']);
-    }
-    
-    public function onlyUsers(): self
-    {
-        return $this->onlyEntities(['users']);
-    }
-    
-    public function onlyComments(): self
-    {
-        return $this->onlyEntities(['comments', 'commentmeta']);
-    }
-    
-    public function everything(): self
-    {
-        // Re-enable all entities (useful after filtering)
-        foreach (array_keys($this->schema->getEntities()) as $entity) {
-            $this->enableEntity($entity, true);
-        }
-        return $this;
-    }
-    
-    protected function isWordPressXml(string $source): bool
-    {
-        try {
-            // Read first few KB to check for WordPress XML markers
-            $handle = fopen($source, 'r');
-            if (!$handle) {
-                return false;
-            }
-            
-            $sample = fread($handle, 2048);
-            fclose($handle);
-            
-            // Check for WordPress XML namespace and WXR version
-            $hasWpNamespace = strpos($sample, 'xmlns:wp="https://wordpress.org/export/') !== false;
-            $hasWxrVersion = strpos($sample, '<wp:wxr_version>') !== false;
-            $hasBaseUrl = strpos($sample, '<wp:base_site_url>') !== false;
-            
-            return $hasWpNamespace && ($hasWxrVersion || $hasBaseUrl);
-            
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
+		// Memory-efficient check for WordPress XML structure
+		$filePath = $import->source_detail;
+		if (!file_exists($filePath)) {
+			return false;
+		}
+
+		// Read only the first 8KB to check for WordPress XML markers
+		$handle = fopen($filePath, 'r');
+		if (!$handle) {
+			return false;
+		}
+
+		$chunk = fread($handle, 8192); // 8KB should be enough for XML header and root elements
+		fclose($handle);
+
+		// Check for WordPress export XML markers
+		return strpos($chunk, '<rss') !== false && 
+		       strpos($chunk, 'wordpress.org/export') !== false &&
+		       strpos($chunk, '<wp:') !== false;
+	}
+
+
+	public static function config(): DriverConfig
+	{
+		return (new DriverConfig())
+			->default(PendingState::class)
+
+			->allowTransition(PendingState::class, CreateStorageState::class)
+			->allowTransition(PendingState::class, FailedState::class)
+
+			->allowTransition(CreateStorageState::class, ProcessingState::class)
+			->allowTransition(CreateStorageState::class, FailedState::class)
+
+			->allowTransition(ProcessingState::class, CompletedState::class)
+			->allowTransition(ProcessingState::class, FailedState::class)
+
+
+			->preferredTransition(PendingState::class, CreateStorageState::class)
+			->preferredTransition(CreateStorageState::class, ProcessingState::class)
+			->preferredTransition(ProcessingState::class, CompletedState::class);
+	}
 }

@@ -11,6 +11,7 @@
     ],
     "require": {
         "php": "^8.2",
+        "crumbls/state-machine": "dev-main",
         "illuminate/support": "^11.0|^12.0",
         "illuminate/database": "^11.0|^12.0",
         "spatie/laravel-medialibrary": "^11.0",
@@ -40,7 +41,7 @@
             ]
         }
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
     "prefer-stable": true,
     "config": {
         "allow-plugins": {

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "985a5eacb3c99b740461ca9b70a84871",
+    "content-hash": "bb014c0194ec0bc72481981811afd717",
     "packages": [
         {
             "name": "brick/math",
@@ -215,6 +215,84 @@
                 }
             ],
             "time": "2024-09-19T14:15:21+00:00"
+        },
+        {
+            "name": "crumbls/state-machine",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "../state-machine",
+                "reference": "f0b0ddc2ae9d50df81b82fa1cab6107fe38419f7"
+            },
+            "require": {
+                "illuminate/bus": "^11.0",
+                "illuminate/events": "^11.0",
+                "illuminate/queue": "^11.0",
+                "illuminate/support": "^11.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^9.0",
+                "pestphp/pest": "^2.0",
+                "pestphp/pest-plugin-laravel": "^2.0",
+                "phpstan/phpstan": "^2.1",
+                "phpstan/phpstan-strict-rules": "^2.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Crumbls\\StateMachine\\StateMachineServiceProvider"
+                    ],
+                    "aliases": {
+                        "StateMachine": "Crumbls\\StateMachine\\Facades\\StateMachine"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Crumbls\\StateMachine\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Crumbls\\StateMachine\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "pest"
+                ],
+                "test-coverage": [
+                    "pest --coverage"
+                ],
+                "analyse": [
+                    "phpstan analyse"
+                ],
+                "check": [
+                    "@analyse",
+                    "@test"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Chase Miller",
+                    "email": "chase@crumbls.com"
+                }
+            ],
+            "description": "A Laravel state machine package with fluent interface configuration",
+            "keywords": [
+                "laravel",
+                "state-machine",
+                "states",
+                "transitions"
+            ],
+            "transport-options": {
+                "relative": true
+            }
         },
         {
             "name": "dflydev/dot-access-data",
@@ -9949,7 +10027,7 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
     "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
