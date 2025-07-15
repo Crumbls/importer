@@ -13,6 +13,7 @@ use Crumbls\Importer\Console\Prompts\FileBrowserPrompt;
 use Crumbls\Importer\Drivers\AutoDriver;
 use Crumbls\Importer\Exceptions\CompatibleDriverNotFoundException;
 use Crumbls\Importer\Exceptions\InputNotProvided;
+use Crumbls\Importer\Exceptions\ImportException;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Models\Import;
 use Crumbls\Importer\Support\SourceResolverManager;
@@ -76,10 +77,10 @@ class ImporterCommand extends Command
 					$root = $matches[1];
 					$source = $matches[2];
 				} else {
-					throw new \InvalidArgumentException("Invalid source format: {$source}");
+					throw ImportException::invalidSourceFormat($source);
 				}
 			} else {
-				throw new \InvalidArgumentException("Source not found: {$source}");
+				throw ImportException::sourceNotFound($source);
 			}
         }
 
@@ -92,7 +93,7 @@ class ImporterCommand extends Command
 		$method = Str::camel('handle source '.$sourceType);
 
 		if (!method_exists($this, $method)) {
-			throw new \BadMethodCallException("Handler method '{$method}' not found for source type '{$sourceType}'");
+			throw ImportException::driverNotFound($sourceType);
 		}
 
 		$record = $this->$method($root, $source);

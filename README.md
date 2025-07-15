@@ -57,11 +57,6 @@ php artisan migrate
 
 This package uses a state machine approach where each import progresses through states:
 
-1. **Initializing** - Setting up the import
-2. **Analyzing** - Examining the source data
-3. **Processing** - Importing the data
-4. **Completed** - Import finished successfully
-
 Each state handles its own UI presentation and business logic, providing a clean separation of concerns.
 
 ## Development Philosophy

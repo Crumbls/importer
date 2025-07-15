@@ -9,6 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\ConnectionInterface;
 use Crumbls\Importer\StorageDrivers\Contracts\TransactionalStorageContract;
+use Crumbls\Importer\Exceptions\StorageException;
 
 class SqliteDriver extends AbstractDriver implements TransactionalStorageContract
 {
@@ -87,6 +88,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function createTable(string $tableName, callable $schemaCallback): static {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		Schema::connection($this->connectionName)->create($tableName, $schemaCallback);
 		
 		return $this;
@@ -95,6 +97,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function createTableFromSchema(string $tableName, array $schema): static {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		// Convert schema definition to Laravel Blueprint
 		Schema::connection($this->connectionName)->create($tableName, function (Blueprint $table) use ($schema) {
 			if (isset($schema['columns'])) {
@@ -115,6 +118,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 
 	protected function addColumnFromDefinition(Blueprint $table, string $name, array $definition): void
 	{
+		$this->validateColumnName($name);
 		$type = $definition['type'] ?? 'string';
 		$options = $definition;
 		
@@ -159,6 +163,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function dropTable(string $tableName): static {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		Schema::connection($this->connectionName)->dropIfExists($tableName);
 		
 		return $this;
@@ -167,13 +172,14 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function tableExists(string $tableName): bool {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		return Schema::connection($this->connectionName)->hasTable($tableName);
 	}
 
 	public function getTables(): array {
 		$this->connect();
 		
-		$tables = $this->db->select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+		$tables = $this->db->select("SELECT name FROM sqlite_master WHERE type = ? AND name NOT LIKE ?", ['table', 'sqlite_%']);
 		
 		return array_column($tables, 'name');
 	}
@@ -181,6 +187,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function insert(string $tableName, array $data): static {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		$this->db->table($tableName)->insert($data);
 		
 		return $this;
@@ -189,6 +196,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function insertBatch(string $tableName, array $rows): static {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		$this->db->table($tableName)->insert($rows);
 		
 		return $this;
@@ -197,6 +205,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function select(string $tableName, array $conditions = []): array {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		$query = $this->db->table($tableName);
 		
 		foreach ($conditions as $column => $value) {
@@ -213,6 +222,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function update(string $tableName, array $data, array $conditions): static {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		$query = $this->db->table($tableName);
 		
 		foreach ($conditions as $column => $value) {
@@ -231,6 +241,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function delete(string $tableName, array $conditions): static {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		$query = $this->db->table($tableName);
 		
 		foreach ($conditions as $column => $value) {
@@ -249,6 +260,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function count(string $tableName, array $conditions = []): int {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		$query = $this->db->table($tableName);
 		
 		foreach ($conditions as $column => $value) {
@@ -299,6 +311,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function getColumns(string $tableName): array {
 		$this->connect();
 		
+		$this->validateTableName($tableName);
 		return Schema::connection($this->connectionName)->getColumnListing($tableName);
 	}
 
@@ -312,8 +325,26 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 
 	public function db() : SQLiteConnection {
 		if (!isset($this->db)) {
-			throw new \RuntimeException('Database connection is not established');
+			throw StorageException::connectionFailed('Database connection is not established');
 		}
 		return $this->db;
+	}
+
+	/**
+	 * Validate table name to prevent SQL injection
+	 */
+	protected function validateTableName(string $tableName): void {
+		if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $tableName)) {
+			throw StorageException::invalidTableName($tableName);
+		}
+	}
+
+	/**
+	 * Validate column name to prevent SQL injection
+	 */
+	protected function validateColumnName(string $columnName): void {
+		if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $columnName)) {
+			throw StorageException::invalidColumnName($columnName);
+		}
 	}
 }

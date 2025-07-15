@@ -7,6 +7,7 @@ use Crumbls\Importer\States\ProcessingState as BaseState;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Services\XmlParsingService;
 use Crumbls\Importer\Parsers\WordPressXmlParser;
+use Crumbls\Importer\Exceptions\ImportException;
 
 class ProcessingState extends AbstractState
 {
@@ -58,6 +59,6 @@ class ProcessingState extends AbstractState
     protected function createParser(ImportContract $import): \Crumbls\Importer\Contracts\XmlParserContract
     {
 		// TODO: Implement parser creation logic based on import type
-		throw new \RuntimeException('Parser creation not implemented');
+		throw ImportException::parserCreationFailed('Parser creation not implemented');
     }
 }

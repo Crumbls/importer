@@ -3,6 +3,7 @@
 namespace Crumbls\Importer\Support;
 
 use Crumbls\Importer\Resolvers\Contracts\SourceResolverContract;
+use Crumbls\Importer\Exceptions\ImportException;
 
 class SourceResolverManager
 {
@@ -22,7 +23,7 @@ class SourceResolverManager
             }
         }
 
-        throw new \InvalidArgumentException("No resolver found for source type: {$sourceDetail}");
+        throw ImportException::sourceNotFound($sourceDetail);
     }
 
     public function getMetadata(string $sourceType, string $sourceDetail): array
