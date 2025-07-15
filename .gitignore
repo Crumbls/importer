@@ -1,0 +1,61 @@
+# Markdown files
+*.md
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Laravel specific
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+/build/
+/dist/
+*.log
+
+# Testing
+/coverage/
+.phpunit.cache
+phpunit.xml
+phpunit.dev.xml
+
+# Composer
+composer.lock
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Cache files
+/storage/framework/cache/
+/storage/framework/sessions/
+/storage/framework/views/
+/storage/logs/
+
+# Package specific
+*.sqlite
+*.sqlite3

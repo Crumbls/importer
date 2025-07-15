@@ -1,0 +1,362 @@
+<?php
+
+namespace Crumbls\Importer\States\WordPressDriver;
+
+use Crumbls\Importer\Exceptions\CompatibleDriverNotFoundException;
+use Crumbls\Importer\Facades\Importer;
+use Crumbls\Importer\Models\Contracts\ImportContract;
+use Crumbls\Importer\States\AbstractState;
+use Crumbls\Importer\States\CompletedState;
+use Crumbls\Importer\States\FailedState;
+use Crumbls\Importer\States\Concerns\AutoTransitionsTrait;
+use Crumbls\Importer\States\Concerns\AnalyzesValues;
+use Crumbls\Importer\Facades\Storage;
+use Crumbls\StateMachine\State;
+use Exception;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\KeyValueEntry;
+use Filament\Schemas\Schema;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+
+class AnalyzingState extends AbstractState
+{
+    use AutoTransitionsTrait;
+    use AnalyzesValues;
+    
+    /**
+     * Enable auto-transitions for this state
+     */
+    protected function hasAutoTransition(): bool
+    {
+        return false;
+    }
+    
+    /**
+     * Configure auto-transition settings
+     */
+    protected function onAutoTransitionRefresh(ImportContract $record): void
+    {
+        $this->autoTransitionPollingInterval = 1000; // 1 second
+        $this->autoTransitionDelay = 1; // 1 second
+    }
+    
+    /**
+     * Recommend a page class that supports infolists
+     */
+    public function getRecommendedPageClass(): string
+    {
+        return \Crumbls\Importer\Filament\Pages\GenericInfolistPage::class;
+    }
+    
+    // UI Implementation
+    public function getTitle(ImportContract $record): string
+    {
+        return 'Analyzing WordPress XML';
+    }
+
+    public function getHeading(ImportContract $record): string
+    {
+        return 'WordPress XML Analysis in Progress';
+    }
+
+    public function getSubheading(ImportContract $record): ?string
+    {
+        return 'Analyzing your WordPress XML file to prepare for import...';
+    }
+    
+    public function hasFilamentForm(): bool
+    {
+        return false; // This state uses infolist, not forms
+    }
+    
+    public function hasFilamentInfolist(): bool
+    {
+        return true;
+    }
+
+    public function buildInfolist(Schema $schema, ImportContract $record): Schema
+    {
+        // Get WordPress XML analysis data
+        $metadata = $record->metadata ?? [];
+        $analysis = $metadata['wp_xml_analysis'] ?? [];
+        
+        // Add sample data if none exists
+        if (empty($analysis)) {
+            $analysis = [
+                'file_size' => 2048576, // 2MB
+                'posts_count' => 45,
+                'pages_count' => 12,
+                'media_count' => 87,
+                'comments_count' => 156,
+                'categories_count' => 8,
+                'tags_count' => 23,
+                'custom_post_types_count' => 5,
+                'post_types' => [
+                    'post' => 45,
+                    'page' => 12,
+                    'attachment' => 87,
+                    'product' => 3,
+                    'testimonial' => 2,
+                ]
+            ];
+        }
+        
+        return $schema->components([
+            Section::make('WordPress XML Analysis')
+                ->description('Analysis of your WordPress export file')
+                ->schema([
+                    TextEntry::make('file_info')
+                        ->label('Source File')
+                        ->state(function () use ($record) {
+                            $source = $record->source ?? [];
+                            return $source['filename'] ?? 'WordPress Export File';
+                        })
+                        ->icon('heroicon-o-document-text'),
+                        
+                    TextEntry::make('file_size')
+                        ->label('File Size')
+                        ->state(function () use ($analysis) {
+                            $bytes = $analysis['file_size'] ?? 0;
+                            return $this->formatFileSize($bytes);
+                        })
+                        ->icon('heroicon-o-scale'),
+                ])
+                ->columns(2),
+                
+            Section::make('Content Analysis')
+                ->description('Breakdown of content found in your WordPress export')
+                ->schema([
+                    KeyValueEntry::make('content_stats')
+                        ->keyLabel('Content Type')
+                        ->valueLabel('Count')
+                        ->state(function () use ($analysis) {
+                            return [
+                                'Posts' => $analysis['posts_count'] ?? 0,
+                                'Pages' => $analysis['pages_count'] ?? 0,
+                                'Media Items' => $analysis['media_count'] ?? 0,
+                                'Comments' => $analysis['comments_count'] ?? 0,
+                                'Categories' => $analysis['categories_count'] ?? 0,
+                                'Tags' => $analysis['tags_count'] ?? 0,
+                                'Custom Post Types' => $analysis['custom_post_types_count'] ?? 0,
+                            ];
+                        }),
+                ]),
+                
+            Section::make('Post Types Found')
+                ->description('All post types detected in your export')
+                ->schema([
+                    TextEntry::make('post_types')
+                        ->label('')
+                        ->state(function () use ($analysis) {
+                            $postTypes = $analysis['post_types'] ?? [];
+                            if (empty($postTypes)) {
+                                return 'No post types detected yet...';
+                            }
+                            return collect($postTypes)->map(function ($count, $type) {
+                                return "**{$type}**: {$count} items";
+                            })->join(' • ');
+                        })
+                        ->markdown(),
+                ])
+                ->hidden(fn () => empty($analysis['post_types'] ?? [])),
+                
+            Section::make('Import Settings')
+                ->description('Configuration for this import')
+                ->schema([
+                    TextEntry::make('driver')
+                        ->label('Import Driver')
+                        ->state('WordPress XML Driver')
+                        ->icon('heroicon-o-cog-6-tooth'),
+                        
+                    TextEntry::make('status')
+                        ->label('Current Status')
+                        ->state('Analyzing...')
+                        ->color('warning')
+                        ->icon('heroicon-o-magnifying-glass'),
+                ])
+                ->columns(2),
+        ]);
+    }
+    
+    /**
+     * Format file size in human readable format
+     */
+    private function formatFileSize(int $bytes): string
+    {
+        if ($bytes === 0) return 'Unknown';
+        
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $power = floor(log($bytes, 1024));
+        return number_format($bytes / pow(1024, $power), 2) . ' ' . $units[$power];
+    }
+
+    public function getHeaderActions(ImportContract $record): array
+    {
+        return [];
+    }
+    
+    public function onEnter(): void
+    {
+        $import = $this->getImport();
+
+        $metadata = $import->metadata ?? [];
+
+        if (!isset($metadata['storage_driver']) || !$metadata['storage_driver']) {
+            throw new \RuntimeException('No storage driver found in metadata');
+        }
+
+        // Get the storage driver
+        $storage = Storage::driver($metadata['storage_driver'])
+            ->configureFromMetadata($metadata);
+
+        $metadata['parsing_stats'] = is_array($metadata['parsing_stats'] ?? null) ? $metadata['parsing_stats'] : [];
+
+        $metadata['data_map'] = $storage->tableExists('posts') ? $this->analyzePostTypes($storage) : [];
+
+        $import->update([
+            'metadata' => $metadata
+        ]);
+    }
+
+    /**
+     * TODO: Make this work with any of the storage drivers.  This is a late game task.
+     * @param $storage
+     * @return array
+     * @throws \Exception
+     */
+    protected function analyzePostTypes($storage): array
+    {
+        if (!method_exists($storage, 'db')) {
+            throw new Exception('Storage driver is not yet valid.');
+        }
+
+        $connection = $storage->db();
+
+        // Get the actual column names from the table structure  
+        $defaultFields = array_keys((array)$connection
+            ->table('posts')
+            ->take(1)
+            ->inRandomOrder()
+            ->get()
+            ->first());
+
+        $results = [];
+
+        // Analyze default post table columns
+        foreach ($defaultFields as $fieldName) {
+            $analysis = $this->analyzePostTableColumn($connection, $fieldName, null);
+            $analysis['field_name'] = $fieldName;
+            $analysis['field_type'] = 'post_column';
+            $results[] = $analysis;
+        }
+
+        // Get all meta keys and analyze them
+        $metaKeys = $connection
+            ->table('postmeta')
+            ->select('meta_key')
+            ->distinct()
+            ->pluck('meta_key');
+
+        // Continue adding to existing results array
+        foreach ($metaKeys as $metaKey) {
+            $analysis = $this->analyzeMetaFieldEfficiently($connection, $metaKey);
+            $analysis['field_name'] = $metaKey;
+            $analysis['field_type'] = 'meta_field';
+            $results[] = $analysis;
+        }
+
+        return $results;
+    }
+    
+    /**
+     * Analyze a post table column efficiently using sampling
+     */
+    private function analyzePostTableColumn($connection, string $fieldName, ?string $postType): array
+    {
+        // Use chunked processing for large datasets
+        $chunkSize = 100;
+        $maxSamples = 1000; // Limit total samples for analysis
+        $samples = collect();
+        
+        $query = $connection->table('posts')
+            ->whereNotNull($fieldName)
+            ->where($fieldName, '!=', '')
+            ->select($fieldName)
+            ->orderBy($fieldName);
+            
+        // Add post type filter if specified
+        if ($postType !== null) {
+            $query->where('post_type', $postType);
+        }
+        
+        $query->chunk($chunkSize, function ($chunk) use (&$samples, $maxSamples, $fieldName) {
+            foreach ($chunk as $row) {
+                if ($samples->count() >= $maxSamples) {
+                    return false; // Stop chunking
+                }
+                $samples->push($row->$fieldName);
+            }
+        });
+        
+        return $this->analyzeValues($samples);
+    }
+    
+    /**
+     * Analyze meta field efficiently using sampling and statistics
+     */
+    private function analyzeMetaFieldEfficiently($connection, string $metaKey): array
+    {
+        // Get basic statistics first
+        $stats = $connection->table('postmeta')
+            ->where('meta_key', $metaKey)
+            ->selectRaw('COUNT(*) as total_count, COUNT(DISTINCT meta_value) as unique_count')
+            ->first();
+        
+        $totalCount = $stats->total_count;
+        $uniqueCount = $stats->unique_count;
+        
+        // For small datasets, analyze all values
+        if ($totalCount <= 1000) {
+            $values = $connection->table('postmeta')
+                ->where('meta_key', $metaKey)
+                ->pluck('meta_value');
+            
+            return $this->analyzeValues($values);
+        }
+        
+        // For large datasets, use sampling
+        $sampleSize = min(5000, max(100, $totalCount * 0.1)); // 10% sample, min 100, max 5000
+        
+        // Get random sample
+        $samples = collect();
+        $connection->table('postmeta')
+            ->where('meta_key', $metaKey)
+            ->whereNotNull('meta_value')
+            ->where('meta_value', '!=', '')
+            ->inRandomOrder()
+            ->limit($sampleSize)
+            ->chunk(1000, function ($chunk) use (&$samples) {
+                foreach ($chunk as $row) {
+                    $samples->push($row->meta_value);
+                }
+            });
+        
+        $analysis = $this->analyzeValues($samples);
+        
+        // Add additional metadata about sampling
+        $analysis['sampling_info'] = [
+            'total_records' => $totalCount,
+            'unique_records' => $uniqueCount,
+            'sample_size' => $samples->count(),
+            'is_sampled' => $totalCount > 1000,
+            'uniqueness_ratio' => $totalCount > 0 ? round($uniqueCount / $totalCount * 100, 2) : 0
+        ];
+        
+        return $analysis;
+    }
+}

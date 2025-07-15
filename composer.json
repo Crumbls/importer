@@ -1,0 +1,59 @@
+{
+    "name": "crumbls/importer",
+    "description": "A Laravel and Filament package for importing data",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Crumbls",
+            "email": "importer@crumbls.com"
+        }
+    ],
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../state-machine"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "crumbls/state-machine": "*",
+        "laravel/framework": "^12.0",
+        "filament/filament": "^4.x-dev",
+        "spatie/laravel-package-tools": "^1.16"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0",
+        "pestphp/pest": "^3.8.0",
+        "pestphp/pest-plugin-laravel": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Crumbls\\Importer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Crumbls\\Importer\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Crumbls\\Importer\\ImporterServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "./vendor/bin/pest",
+        "test-filter": "./vendor/bin/pest --filter"
+    }
+}
