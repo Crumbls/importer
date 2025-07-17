@@ -55,13 +55,11 @@ class ImportService extends Manager
 
         $drivers = array_keys($this->customCreators);
 
-	    
+
 
 	    usort($drivers, function($a, $b) {
 			$driverA = $this->driver($a);
             $driverB = $this->driver($b);
-			$driverA::getPriority();
-			$driverB::getPriority();
 		    return $driverA::getPriority() <=> $driverB::getPriority();
         });
 

@@ -25,7 +25,10 @@ class TestCase extends Orchestra
             'import' => \Crumbls\Importer\Models\Import::class,
         ]);
         
-        // Set up auth config with a class that exists
+        // Set up auth config with a class that exists in the test environment
         $app['config']->set('auth.providers.users.model', \App\Models\User::class);
+        
+        // Set up composer autoloader for test models
+        $app['files']->requireOnce(__DIR__ . '/Models/User.php');
     }
 }

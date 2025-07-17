@@ -5,11 +5,11 @@ namespace Crumbls\Importer\States\WpXmlDriver;
 use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\States\XmlDriver\ExtractState as BaseState;
 use Crumbls\Importer\Models\Contracts\ImportContract;
-use Crumbls\Importer\Parsers\WordPressXmlStreamParser;
-use Crumbls\Importer\Support\SourceResolverManager;
-use Crumbls\Importer\Resolvers\FileSourceResolver;
+use Crumbls\Importer\Jobs\ExtractWordPressXmlJob;
 use Crumbls\Importer\States\Shared\FailedState;
+use Crumbls\Importer\States\Concerns\AutoTransitionsTrait;
 use Exception;
+use Illuminate\Support\Facades\Log;
 use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -21,11 +21,60 @@ use Illuminate\Support\Facades\DB;
 
 class ExtractState extends BaseState
 {
+    use AutoTransitionsTrait;
 
+
+	/**
+	 * Additional refresh logic for states to override
+	 */
+	protected function onAutoTransitionRefresh(ImportContract $record): void
+	{
+
+		$this->autoTransitionPollingInterval = 2000; // 1 second
+		$this->autoTransitionDelay = 0; // 1 second
+
+		// Update extraction progress in the UI during polling
+		$metadata = $record->metadata ?? [];
+		if (isset($metadata['extraction_progress'])) {
+			// You can dispatch events here to update progress bars
+			// or show current extraction status
+		}
+
+	}
+
+    // Auto-transition configuration
     public function onEnter(): void
     {
-        // Don't run extraction in onEnter anymore - let the UI handle it
-        // This allows the user to see the extraction progress
+        // Get import from context using the standard method
+        $import = $this->getImport();
+        
+        if (!$import) {
+            Log::error('No import found in ExtractState context');
+            return;
+        }
+        
+        // Dispatch background job for extraction
+        try {
+            ExtractWordPressXmlJob::dispatch($import)
+                ->delay(now()->addSeconds(2)); // Small delay for UI feedback
+                
+            // Mark job as dispatched
+            $metadata = $import->metadata ?? [];
+            $metadata['extraction_job_dispatched'] = true;
+            $metadata['extraction_status'] = 'queued';
+            $metadata['extraction_dispatched_at'] = now()->toISOString();
+            
+            $import->update(['metadata' => $metadata]);
+            
+        } catch (\Exception $e) {
+            // Fallback to synchronous processing if job dispatch fails
+            Log::warning('Failed to dispatch extraction job, falling back to sync processing', [
+                'import_id' => $import->getKey(),
+                'error' => $e->getMessage()
+            ]);
+            
+            $this->performExtractionSync($import);
+        }
     }
 
     // Filament UI Implementation
@@ -51,22 +100,19 @@ class ExtractState extends BaseState
 
     public function getFilamentForm(Schema $schema, ImportContract $record): Schema
     {
+        $metadata = $record->metadata ?? [];
+        $status = $metadata['extraction_status'] ?? 'starting';
+        $progress = $metadata['extraction_progress'] ?? 0;
+        $current = $metadata['extraction_current'] ?? 0;
+        $total = $metadata['extraction_total'] ?? 0;
+        
         return $schema->schema([
-            Section::make('Processing Status')
-                ->description('Extracting content from your WordPress XML file using optimized streaming.')
+            Section::make('Background Processing')
+                ->description('Your WordPress XML file is being processed in the background using optimized streaming.')
                 ->schema([
-                    Placeholder::make('loading_status')
-                        ->content('⚡ **Processing WordPress XML file**
-
-⏱️ *Extracting posts, pages, media, and metadata - 3 seconds*
-
-Using our optimized XMLReader streaming parser to efficiently process your WordPress content without memory limits.')
+                    Placeholder::make('job_status')
+                        ->content($this->getJobStatusMessage($status, $progress, $current, $total))
                         ->columnSpanFull(),
-
-                    View::make('auto-submit')
-                        ->view('crumbls-importer::filament.forms.components.auto-submit')
-                        ->viewData(['delay' => 3000])
-                        ->dehydrated(false),
                 ])
                 ->collapsible(false),
 
@@ -102,23 +148,104 @@ The extraction process uses memory-efficient streaming to handle files of any si
         ];
     }
 
+    // No form save handling needed for UI - extraction runs via background job
+    // But provide synchronous extraction for command-line usage
+
     public function handleFilamentFormSave(array $data, $record): void
     {
-        // This method is called when the form is auto-submitted
-        $this->performExtraction($record);
-        $this->transitionToNextState($record);
+        // This method is called by the command's executeStateProcessing
+        // Run extraction synchronously for command-line usage
+        $this->performExtractionSync($record, true);
     }
 
-    public function handleFilamentSaveComplete($page): void
+    protected function getJobStatusMessage(string $status, float $progress, int $current, int $total): string
     {
-        // The transition already happened in handleFilamentFormSave
-        // Just refresh the page to show the new state
-        $page->redirect($page->getResourceUrl('step', ['record' => $page->record]));
+        switch($status) {
+            case 'queued':
+                return '⏳ **Queued for Processing**
+
+Your WordPress XML import has been queued for background processing. Large files are processed efficiently using memory-optimized streaming.';
+            
+            case 'initializing':
+                return '🔄 **Initializing Extraction**
+
+Setting up optimized streaming parser and database connections...';
+            
+            case 'processing':
+                return "⚡ **Processing WordPress XML**
+
+**Progress:** {$progress}% (" . number_format($current) . " / " . number_format($total) . " items processed)
+
+🎯 Using memory-efficient streaming to handle files of any size safely. Your import will complete automatically and advance to the next step.";
+            
+            case 'completed':
+                return '✅ **Extraction Complete**
+
+WordPress XML processing completed successfully! Moving to analysis phase...';
+            
+            case 'failed':
+                return '❌ **Extraction Failed**
+
+There was an error processing your WordPress XML file. Please check the logs for details.';
+            
+            default:
+                return '🚀 **Starting Background Processing**
+
+Preparing to process your WordPress XML file using optimized streaming technology...';
+        }
     }
 
-    private function performExtraction($import): void
+    protected function determineQueue(ImportContract $import): string
     {
+        // Estimate processing load based on file size or metadata
+        $metadata = $import->metadata ?? [];
+        
+        if (isset($metadata['file_size'])) {
+            $fileSizeMB = $metadata['file_size'] / (1024 * 1024);
+            
+            if ($fileSizeMB > 100) {
+                return 'heavy-imports'; // Large files
+            } elseif ($fileSizeMB > 10) {
+                return 'medium-imports'; // Medium files
+            }
+        }
+        
+        return 'imports'; // Default queue
+    }
+
+    protected function performExtractionSync(ImportContract $import, bool $allowSync = false): void
+    {
+        if (!$allowSync) {
+            // UI fallback - don't run sync extraction for large files
+            try {
+                $import->update([
+                    'metadata' => array_merge($import->metadata ?? [], [
+                        'extraction_status' => 'failed',
+                        'extraction_message' => 'Synchronous extraction not recommended for large files. Please ensure your queue workers are running.'
+                    ])
+                ]);
+                
+                throw new \Exception('Synchronous extraction not recommended for large files. Please ensure your queue workers are running.');
+                
+            } catch (\Exception $e) {
+                $import->update([
+                    'state' => FailedState::class,
+                    'error_message' => 'Extraction failed: ' . $e->getMessage(),
+                    'failed_at' => now(),
+                ]);
+            }
+            return;
+        }
+        
+        // Command-line synchronous extraction
         try {
+            $import->update([
+                'metadata' => array_merge($import->metadata ?? [], [
+                    'extraction_status' => 'processing',
+                    'extraction_message' => 'Running synchronous extraction for command-line...'
+                ])
+            ]);
+            
             $metadata = $import->metadata ?? [];
             
             // Reconfigure the database connection since it's lost between requests
@@ -142,21 +269,24 @@ The extraction process uses memory-efficient streaming to handle files of any si
                 ->configureFromMetadata($metadata);
 
             // Set up the source resolver
-            $sourceResolver = new SourceResolverManager();
+            $sourceResolver = new \Crumbls\Importer\Support\SourceResolverManager();
             if ($import->source_type == 'storage') {
-                $sourceResolver->addResolver(new FileSourceResolver($import->source_type, $import->source_detail));
+                $sourceResolver->addResolver(new \Crumbls\Importer\Resolvers\FileSourceResolver(
+                    $import->source_type,
+                    $import->source_detail
+                ));
             } else {
                 throw new \Exception("Unsupported source type: {$import->source_type}");
             }
 
-            // Create and configure the WordPress XML parser
-            $parser = new WordPressXmlStreamParser([
-                'batch_size' => 100,
+            // Create and configure the WordPress XML parser for command-line use
+            $parser = new \Crumbls\Importer\Parsers\WordPressXmlStreamParser([
+                'batch_size' => 50, // Smaller batches for command-line
                 'extract_meta' => true,
                 'extract_comments' => true,
                 'extract_terms' => true,
                 'extract_users' => true,
-                'memory_limit' => '256M',
+                'memory_limit' => '512M',
             ]);
             
             // Parse the XML file
@@ -165,30 +295,36 @@ The extraction process uses memory-efficient streaming to handle files of any si
             // Update import with parsing results
             $import->update([
                 'metadata' => array_merge($metadata, [
+                    'extraction_completed' => true,
                     'parsing_completed' => true,
                     'parsing_stats' => $stats,
                     'processed_at' => now()->toISOString(),
+                    'extraction_status' => 'completed',
                 ])
             ]);
 
-            Notification::make()
-                ->title('Extraction Complete!')
-                ->body("Processed {$stats['posts']} posts, {$stats['comments']} comments, and {$stats['terms']} terms.")
-                ->success()
-                ->send();
+            Log::info('Synchronous extraction completed successfully', [
+                'import_id' => $import->getKey(),
+                'posts_processed' => $stats['posts'] ?? 0,
+                'total_items' => ($stats['posts'] ?? 0) + ($stats['comments'] ?? 0) + ($stats['terms'] ?? 0)
+            ]);
 
         } catch (\Exception $e) {
             $import->update([
                 'state' => FailedState::class,
-                'error_message' => $e->getMessage(),
+                'error_message' => 'Extraction failed: ' . $e->getMessage(),
                 'failed_at' => now(),
+                'metadata' => array_merge($import->metadata ?? [], [
+                    'extraction_status' => 'failed',
+                    'extraction_error' => $e->getMessage(),
+                ])
             ]);
 
-            Notification::make()
-                ->title('Extraction Failed')
-                ->body('Extraction failed: ' . $e->getMessage())
-                ->danger()
-                ->send();
+            Log::error('Synchronous extraction failed', [
+                'import_id' => $import->getKey(),
+                'error' => $e->getMessage()
+            ]);
+            
             throw $e;
         }
     }
@@ -239,32 +375,71 @@ The extraction process uses memory-efficient streaming to handle files of any si
         }
     }
 
-    // Contract requirement - keep for compatibility
+    // Contract requirement - disabled for completion-based flow
     public function getFilamentAutoSubmitDelay(): int
     {
-        return 0; // Disabled - using polling instead
+        return 0; // Disabled - using polling and shouldAutoTransition instead
     }
 
     // Polling-based workflow for extraction monitoring
     public function getFilamentPollingInterval(): ?int
     {
-        return 2000; // Poll every 2 seconds during extraction
+        return $this->getPollingInterval();
     }
 
     public function shouldAutoTransition(ImportContract $record): bool
     {
-        // Check if extraction has completed
+        // Check if extraction has completed - this triggers auto-transition
         $metadata = $record->metadata ?? [];
-        return isset($metadata['extraction_completed']) && $metadata['extraction_completed'];
+
+        // If extraction hasn't started yet, start it
+        if (!isset($metadata['extraction_started'])) {
+            $this->startExtractionAsync($record);
+            return false;
+        }
+
+        // Check if extraction has completed successfully
+        $isCompleted = isset($metadata['extraction_completed']) && $metadata['extraction_completed'];
+        $status = $metadata['extraction_status'] ?? 'unknown';
+
+        // Only auto-transition if extraction is complete and successful
+        return $isCompleted && $status === 'completed';
     }
 
     public function onFilamentRefresh(ImportContract $record): void
     {
-        // Update extraction progress in the UI during polling
-        $metadata = $record->metadata ?? [];
-        if (isset($metadata['extraction_progress'])) {
-            // You can dispatch events here to update progress bars
-            // or show current extraction status
+        // Use the trait's auto-transition polling logic
+        $this->onRefresh($record);
+    }
+
+    private function startExtractionAsync(ImportContract $record): void
+    {
+        try {
+            // Mark extraction as started to prevent multiple starts
+            $metadata = $record->metadata ?? [];
+            $metadata['extraction_started'] = true;
+            $metadata['extraction_started_at'] = now()->toISOString();
+            
+            $record->update(['metadata' => $metadata]);
+            
+            // Dispatch the background job for extraction
+            ExtractWordPressXmlJob::dispatch($record)
+                ->delay(now()->addSeconds(2)); // Small delay for UI feedback
+                
+            // Update metadata to show job was dispatched
+            $metadata['extraction_job_dispatched'] = true;
+            $metadata['extraction_status'] = 'queued';
+            $metadata['extraction_dispatched_at'] = now()->toISOString();
+            
+            $record->update(['metadata' => $metadata]);
+            
+        } catch (\Exception $e) {
+            // Mark as failed if extraction can't start
+            $record->update([
+                'state' => FailedState::class,
+                'error_message' => 'Failed to start extraction: ' . $e->getMessage(),
+                'failed_at' => now(),
+            ]);
         }
     }
 }

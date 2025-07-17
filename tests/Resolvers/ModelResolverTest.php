@@ -1,9 +1,14 @@
 <?php
 
-use Crumbls\Importer\Services\ModelResolver;
+use Crumbls\Importer\Resolvers\ModelResolver;
 
 beforeEach(function () {
     ModelResolver::clearCache();
+    
+    // Reset to clean config state
+    config(['importer.models' => [
+        'import' => \Crumbls\Importer\Models\Import::class,
+    ]]);
 });
 
 it('resolves import model from config', function () {
@@ -13,6 +18,7 @@ it('resolves import model from config', function () {
 });
 
 it('resolves user model from auth config', function () {
+    // Use a model class that definitely exists in the test environment
     config(['auth.providers.users.model' => \App\Models\User::class]);
     
     $modelClass = ModelResolver::user();
@@ -23,7 +29,16 @@ it('resolves user model from auth config', function () {
 it('falls back to default user model when auth config is not set', function () {
     config(['auth.providers.users.model' => null]);
     
-    expect(fn() => ModelResolver::user())->toThrow(InvalidArgumentException::class, "Model class 'App\Models\User' does not exist.");
+    // Since our test User class exists, this should work
+    $modelClass = ModelResolver::user();
+    
+    expect($modelClass)->toBe(\App\Models\User::class);
+});
+
+it('throws exception when user model class does not exist', function () {
+    config(['auth.providers.users.model' => 'NonExistentUserModel']);
+    
+    expect(fn() => ModelResolver::user())->toThrow(InvalidArgumentException::class, "Model class 'NonExistentUserModel' does not exist.");
 });
 
 it('throws exception for non-existent model key', function () {
@@ -42,10 +57,10 @@ it('throws exception with available models suggestion', function () {
 })->throws(InvalidArgumentException::class, "Available models: import, export");
 
 it('throws exception for non-existent class', function () {
-    config(['importer.models.test' => 'NonExistentClass']);
+    config(['importer.models.test' => 'App\\Models\\NonExistentClass']);
     
-    ModelResolver::test();
-})->throws(InvalidArgumentException::class, "Model class 'NonExistentClass' does not exist.");
+    expect(fn() => ModelResolver::test())->toThrow(InvalidArgumentException::class, "Model class 'App\\Models\\NonExistentClass' does not exist.");
+});
 
 it('caches resolved models', function () {
     $first = ModelResolver::import();

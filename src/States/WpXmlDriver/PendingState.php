@@ -3,7 +3,9 @@
 namespace Crumbls\Importer\States\WpXmlDriver;
 
 use Crumbls\Importer\Drivers\WpXmlDriver;
+use Crumbls\Importer\Filament\Pages\GenericInfolistPage;
 use Crumbls\Importer\Models\Contracts\ImportContract;
+use Crumbls\Importer\States\Concerns\AutoTransitionsTrait;
 use Crumbls\Importer\States\PendingState as BaseState;
 use Crumbls\Importer\Support\StateMachineRunner;
 use Filament\Schemas\Components\Section;
@@ -15,12 +17,14 @@ use Filament\Notifications\Notification;
 
 class PendingState extends BaseState
 {
+	use AutoTransitionsTrait;
+
     /**
      * Use the infolist page
      */
     public function getRecommendedPageClass(): string
     {
-        return \Crumbls\Importer\Filament\Pages\GenericInfolistPage::class;
+		return GenericInfolistPage::class;
     }
     
     // UI Implementation
@@ -41,7 +45,7 @@ class PendingState extends BaseState
 
     public function hasFilamentForm(): bool
     {
-        return false; // This state uses infolist, not forms
+        return false;
     }
     
     public function hasFilamentInfolist(): bool

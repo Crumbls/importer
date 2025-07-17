@@ -4,7 +4,7 @@ namespace Crumbls\Importer\Filament\Resources;
 
 use Crumbls\Importer\Filament\Resources\ImportResource\Pages;
 use Crumbls\Importer\Models\Contracts\ImportContract;
-use Crumbls\Importer\Services\ModelResolver;
+use Crumbls\Importer\Resolvers\ModelResolver;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Schemas\Components\Section;

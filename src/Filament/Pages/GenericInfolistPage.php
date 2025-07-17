@@ -18,6 +18,7 @@ class GenericInfolistPage extends Page
     public ImportContract $record;
     protected AbstractState $state;
     
+    
     /**
      * What capabilities does this page support?
      */
@@ -197,7 +198,8 @@ class GenericInfolistPage extends Page
         $currentState = $this->record->getStateMachine()->getCurrentState();
         
         if ($currentState !== $this->state) {
-            $this->redirect(static::getResourceUrl('continue', ['record' => $this->record]));
+            // State changed, redirect to new state
+            $this->redirect(static::getResourceUrl('step', ['record' => $this->record]));
         }
     }
     
@@ -223,4 +225,5 @@ class GenericInfolistPage extends Page
     {
         $this->state->onDispatch($event, $data, $this->record);
     }
+    
 }

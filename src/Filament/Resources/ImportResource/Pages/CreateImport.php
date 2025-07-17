@@ -4,7 +4,7 @@ namespace Crumbls\Importer\Filament\Resources\ImportResource\Pages;
 
 use Crumbls\Importer\Filament\Resources\ImportResource;
 use Crumbls\Importer\Models\Contracts\ImportContract;
-use Crumbls\Importer\Services\ModelResolver;
+use Crumbls\Importer\Resolvers\ModelResolver;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;

@@ -3,7 +3,9 @@
 namespace Crumbls\Importer\States;
 
 use Crumbls\Importer\Facades\Storage;
+use Crumbls\Importer\Filament\Pages\GenericFormPage;
 use Crumbls\Importer\Models\Contracts\ImportContract;
+use Crumbls\Importer\States\Concerns\AutoTransitionsTrait;
 use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -16,18 +18,28 @@ use Illuminate\Support\Facades\DB;
 
 class CreateStorageState extends AbstractState
 {
+	use AutoTransitionsTrait;
+
+    /**
+     * Use the form page for auto-transitions
+     */
+    public function getRecommendedPageClass(): string
+    {
+        return GenericFormPage::class;
+    }
+
     // Filament UI Implementation
-    public function getFilamentTitle(ImportContract $record): string
+    public function getTitle(ImportContract $record): string
     {
         return 'Setting Up Storage';
     }
 
-    public function getFilamentHeading(ImportContract $record): string
+    public function getHeading(ImportContract $record): string
     {
         return 'Creating Temporary Storage';
     }
 
-    public function getFilamentSubheading(ImportContract $record): ?string
+    public function getSubheading(ImportContract $record): ?string
     {
         return 'Setting up optimized SQLite database for processing your import...';
     }
@@ -37,12 +49,12 @@ class CreateStorageState extends AbstractState
         return true;
     }
 
-    public function getFilamentForm(Schema $schema, ImportContract $record): Schema
+    public function buildForm(Schema $schema, ImportContract $record): Schema
     {
         return $schema->schema([]);
     }
 
-    public function getFilamentHeaderActions(ImportContract $record): array
+    public function getHeaderActions(ImportContract $record): array
     {
         return [
             Action::make('cancel')
@@ -53,18 +65,11 @@ class CreateStorageState extends AbstractState
         ];
     }
 
-    public function handleFilamentFormSave(array $data, $record): void
+    public function handleSave(array $data, ImportContract $record): void
     {
         // This method is called when the form is auto-submitted
         $this->createStorage($record);
         $this->transitionToNextState($record);
-    }
-
-    public function handleFilamentSaveComplete($page): void
-    {
-        // The transition already happened in handleFilamentFormSave
-        // Just refresh the page to show the new state
-        $page->redirect($page->getResourceUrl('step', ['record' => $page->record]));
     }
 
     private function createStorage($import): void
@@ -86,15 +91,41 @@ class CreateStorageState extends AbstractState
                 $updated = true;
             }
 
-            if (!isset($metadata['storage_path']) || !$metadata['storage_path']) {
-                $storeName = $this->getStoreName($import);
+            $storeName = $this->getStoreName($import);
 
+            if (!isset($metadata['storage_path']) || !$metadata['storage_path']) {
+                // No storage path set, create new storage
                 $storage = Storage::driver($metadata['storage_driver'])
                     ->createOrFindStore($storeName);
 
                 $metadata['storage_path'] = $storage->getStorePath();
                 $metadata['storage_created_at'] = now()->toISOString();
                 $updated = true;
+            } else {
+                // Storage path exists in metadata, check if the actual file/directory exists
+                $existingPath = $metadata['storage_path'];
+                
+                if (!file_exists($existingPath)) {
+                    // Path doesn't exist, create new storage
+                    $storage = Storage::driver($metadata['storage_driver'])
+                        ->createOrFindStore($storeName);
+
+                    $metadata['storage_path'] = $storage->getStorePath();
+                    $metadata['storage_created_at'] = now()->toISOString();
+                    $updated = true;
+                } else {
+                    // Path exists, verify it's accessible and writable
+                    if (!is_writable($existingPath) || !is_readable($existingPath)) {
+                        // Path exists but not accessible, create new storage
+                        $storage = Storage::driver($metadata['storage_driver'])
+                            ->createOrFindStore($storeName);
+
+                        $metadata['storage_path'] = $storage->getStorePath();
+                        $metadata['storage_created_at'] = now()->toISOString();
+                        $updated = true;
+                    }
+                    // Path exists and is accessible, use existing storage
+                }
             }
 
             $sqliteDbPath = $metadata['storage_path'];
@@ -143,18 +174,84 @@ class CreateStorageState extends AbstractState
 
     protected function transitionToNextState($record): void
     {
-
-    }
-
-    public function getFilamentAutoSubmitDelay(): int
-    {
-        return 2000; // 2 seconds
+        try {
+            // Get the driver and its preferred transitions
+            $driver = $record->getDriver();
+            $config = $driver->config();
+            
+            // Get the next preferred state from current state
+            $nextState = $config->getPreferredTransition(static::class);
+            
+            if ($nextState) {
+                // Get the state machine and transition
+                $stateMachine = $record->getStateMachine();
+                $stateMachine->transitionTo($nextState);
+                
+                // Update the record with new state
+                $record->update(['state' => $nextState]);
+                
+                Notification::make()
+                    ->title('Storage Created!')
+                    ->body('Temporary storage created successfully.')
+                    ->success()
+                    ->send();
+            } else {
+                throw new \Exception('No preferred transition found from CreateStorageState');
+            }
+            
+        } catch (\Exception $e) {
+            Notification::make()
+                ->title('Transition Failed')
+                ->body('Failed to proceed to next state: ' . $e->getMessage())
+                ->danger()
+                ->send();
+        }
     }
 
     public function onEnter(): void
     {
-        // Don't run storage creation in onEnter anymore - let the UI handle it
-        // This allows the user to see the storage creation progress
+        // For auto-transitions, we need to create storage immediately
+        if ($this->hasAutoTransition()) {
+            $this->performStorageCreation();
+        }
+    }
+    
+    protected function performStorageCreation(): void
+    {
+        $import = $this->getImport();
+        
+        // Create the storage
+        $storeName = $this->getStoreName($import);
+        $storage = Storage::driver('sqlite')->createOrFindStore($storeName);
+        
+        // Update metadata with storage driver info
+        $metadata = $import->metadata ?? [];
+        $metadata['storage_driver'] = 'sqlite';
+        $metadata['storage_path'] = $storage->getStorePath();
+        $metadata['storage_connection'] = 'import_' . uniqid();
+        $metadata['storage_created_at'] = now()->toISOString();
+        
+        $import->update(['metadata' => $metadata]);
+    }
+    
+    /**
+     * Override shouldAutoTransition to check if storage creation is complete
+     */
+    public function shouldAutoTransition(ImportContract $record): bool
+    {
+        if (!$this->hasAutoTransition()) {
+            return false;
+        }
+        
+        // Check if storage was created successfully
+        $metadata = $record->metadata ?? [];
+        $storageCreated = isset($metadata['storage_driver']) && !empty($metadata['storage_driver']);
+        
+        if (!$storageCreated) {
+            return false;
+        }
+
+		return true;
     }
 
     private function getStoreName(ImportContract $import): string
@@ -162,18 +259,4 @@ class CreateStorageState extends AbstractState
         return "import_{$import->getKey()}";
     }
 
-    // Polling-based workflow for storage creation monitoring
-    public function getFilamentPollingInterval(): ?int
-    {
-        return 1000; // Poll every 1 second during storage creation
-    }
-
-    public function shouldAutoTransition(ImportContract $record): bool
-    {
-        // Check if storage has been created successfully
-        $metadata = $record->metadata ?? [];
-        return isset($metadata['storage_path']) && 
-               isset($metadata['storage_created_at']) && 
-               file_exists($metadata['storage_path']);
-    }
 }

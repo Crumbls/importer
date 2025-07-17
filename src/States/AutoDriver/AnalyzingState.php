@@ -44,7 +44,7 @@ class AnalyzingState extends AbstractState
      */
     public function getRecommendedPageClass(): string
     {
-        return GeneralInfolistPage::class;
+        return GenericInfolistPage::class;
     }
     
     // UI Implementation

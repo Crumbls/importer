@@ -10,6 +10,8 @@ use Crumbls\Importer\States\CompletedState;
 use Crumbls\Importer\States\FailedState;
 use Crumbls\Importer\States\Concerns\AutoTransitionsTrait;
 use Crumbls\Importer\States\Concerns\AnalyzesValues;
+use Crumbls\Importer\States\Concerns\StreamingAnalyzesValues;
+use Crumbls\Importer\Support\MemoryManager;
 use Crumbls\Importer\Facades\Storage;
 use Crumbls\StateMachine\State;
 use Exception;
@@ -26,14 +28,18 @@ use Illuminate\Support\Facades\DB;
 class AnalyzingState extends AbstractState
 {
     use AutoTransitionsTrait;
-    use AnalyzesValues;
+    use AnalyzesValues, StreamingAnalyzesValues {
+        AnalyzesValues::analyzeValues insteadof StreamingAnalyzesValues;
+        AnalyzesValues::generateRecommendations insteadof StreamingAnalyzesValues;
+        StreamingAnalyzesValues::analyzeValuesStreaming insteadof AnalyzesValues;
+    }
     
     /**
      * Enable auto-transitions for this state
      */
     protected function hasAutoTransition(): bool
     {
-        return false;
+        return true;
     }
     
     /**
@@ -307,7 +313,7 @@ class AnalyzingState extends AbstractState
     }
     
     /**
-     * Analyze meta field efficiently using sampling and statistics
+     * 🚀 MEMORY OPTIMIZED: Analyze meta field using streaming analysis
      */
     private function analyzeMetaFieldEfficiently($connection, string $metaKey): array
     {
@@ -320,7 +326,18 @@ class AnalyzingState extends AbstractState
         $totalCount = $stats->total_count;
         $uniqueCount = $stats->unique_count;
         
-        // For small datasets, analyze all values
+        // Initialize memory manager for large datasets
+        $memoryManager = null;
+        if ($totalCount > 10000) {
+            $memoryManager = app(MemoryManager::class);
+            $memoryManager->startMonitoring([
+                'max_memory_usage' => '256M', // Reasonable limit
+                'warning_threshold' => 0.8,   // 80% of memory limit
+                'batch_size' => 1000,         // Starting batch size
+            ]);
+        }
+        
+        // For small datasets, use fast original method
         if ($totalCount <= 1000) {
             $values = $connection->table('postmeta')
                 ->where('meta_key', $metaKey)
@@ -329,33 +346,64 @@ class AnalyzingState extends AbstractState
             return $this->analyzeValues($values);
         }
         
-        // For large datasets, use sampling
-        $sampleSize = min(5000, max(100, $totalCount * 0.1)); // 10% sample, min 100, max 5000
+        // For large datasets, use streaming analysis
+        $maxSamples = min(5000, max(1000, $totalCount * 0.05)); // 5% sample, min 1K, max 5K
         
-        // Get random sample
-        $samples = collect();
-        $connection->table('postmeta')
-            ->where('meta_key', $metaKey)
-            ->whereNotNull('meta_value')
-            ->where('meta_value', '!=', '')
-            ->inRandomOrder()
-            ->limit($sampleSize)
-            ->chunk(1000, function ($chunk) use (&$samples) {
-                foreach ($chunk as $row) {
-                    $samples->push($row->meta_value);
+        // Create data provider that yields batches
+        $dataProvider = function() use ($connection, $metaKey, $memoryManager) {
+            $batchSize = $memoryManager ? $memoryManager->getCurrentBatchSize() : 1000;
+            $offset = 0;
+            
+            while (true) {
+                $chunk = $connection->table('postmeta')
+                    ->where('meta_key', $metaKey)
+                    ->whereNotNull('meta_value')
+                    ->where('meta_value', '!=', '')
+                    ->orderBy('meta_id') // Use indexed column for consistent ordering
+                    ->skip($offset)
+                    ->take($batchSize)
+                    ->get();
+                
+                if ($chunk->isEmpty()) {
+                    break; // No more data
                 }
-            });
+                
+                // Monitor memory pressure during processing
+                if ($memoryManager) {
+                    $memoryManager->monitor();
+                    
+                    // Adjust batch size if memory pressure detected
+                    if ($memoryManager->shouldReduceBatchSize()) {
+                        $memoryManager->adjustBatchSize(0.7); // Reduce by 30%
+                        $batchSize = $memoryManager->getCurrentBatchSize();
+                    }
+                }
+                
+                // Yield the values from this chunk
+                yield $chunk->pluck('meta_value');
+                
+                $offset += $batchSize;
+            }
+        };
         
-        $analysis = $this->analyzeValues($samples);
+        // Use streaming analysis
+        $analysis = $this->analyzeValuesStreaming($dataProvider, $maxSamples, $memoryManager);
         
-        // Add additional metadata about sampling
+        // Add metadata about the analysis
         $analysis['sampling_info'] = [
             'total_records' => $totalCount,
             'unique_records' => $uniqueCount,
-            'sample_size' => $samples->count(),
+            'sample_size' => $analysis['breakdown']['total_count'] ?? 0,
             'is_sampled' => $totalCount > 1000,
-            'uniqueness_ratio' => $totalCount > 0 ? round($uniqueCount / $totalCount * 100, 2) : 0
+            'uniqueness_ratio' => $totalCount > 0 ? round($uniqueCount / $totalCount * 100, 2) : 0,
+            'memory_optimized' => $totalCount > 10000,
+            'memory_stats' => $memoryManager ? $memoryManager->getMemoryStats() : null,
         ];
+        
+        // Clean up memory manager
+        if ($memoryManager) {
+            $memoryManager->cleanup();
+        }
         
         return $analysis;
     }

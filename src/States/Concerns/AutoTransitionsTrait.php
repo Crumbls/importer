@@ -65,14 +65,17 @@ trait AutoTransitionsTrait
      */
     protected function hasAutoTransition(): bool
     {
-        return false; // Disabled by default
-    }
+        return true;
+	}
     
     /**
      * Additional refresh logic for states to override
      */
     protected function onAutoTransitionRefresh(ImportContract $record): void
     {
-        // States can override this for custom refresh logic
+
+		$this->autoTransitionPollingInterval = 1000; // 1 second
+	    $this->autoTransitionDelay = 1; // 1 second
+
     }
 }

@@ -8,7 +8,7 @@ use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Models\Traits\BelongsToTenant;
 use Crumbls\Importer\Models\Traits\BelongsToUser;
-use Crumbls\Importer\Services\ModelResolver;
+use Crumbls\Importer\Resolvers\ModelResolver;
 use Crumbls\Importer\States\Contracts\ImportStateContract;
 use Crumbls\StateMachine\Exceptions\StateSerializationException;
 use Crumbls\StateMachine\StateMachine;
@@ -163,6 +163,11 @@ class Import extends Model implements ImportContract
 			
 			if (json_last_error() !== JSON_ERROR_NONE) {
 				throw StateSerializationException::invalidJson($data);
+			}
+			
+			// Ensure context is properly set when restoring
+			if (!isset($parsedData['context'])) {
+				$parsedData['context'] = $this->getStateMachineContext();
 			}
 			
 			$this->stateMachineInstance = StateMachine::restore($parsedData);

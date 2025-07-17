@@ -14,6 +14,7 @@ use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Infolists\Concerns\InteractsWithInfolists;
 use Filament\Infolists\Contracts\HasInfolists;
 use Filament\Schemas\Schema;
+use Filament\Tables\Table;
 
 class ImportStep extends Page implements HasInfolists
 {

@@ -27,9 +27,11 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	}
 
 	public function createOrFindStore(string $name): static {
-		// Make sure the filename is safe
+
+		$name = Str::chopEnd($name, '.sqlite');
+
 		$name = preg_replace('/[^a-zA-Z0-9\-_]/', '_', $name);
-		
+
 		if (!Str::endsWith($name, '.sqlite')) {
 			$name .= '.sqlite';
 		}
@@ -37,6 +39,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 		$this->storePath = storage_path('app/imports/' . $name);
 
 		$directory = dirname($this->storePath);
+
 		if (!is_dir($directory)) {
 			mkdir($directory, 0755, true);
 		}
@@ -61,10 +64,16 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 	public function connect(): static {
 		if (!$this->connected) {
 			$connectionName = 'import_' . uniqid();
-			
+
+			$storePath = $this->getStorePath();
+
+			if (!file_exists($storePath)) {
+				touch($this->storePath);
+			}
+
 			config(["database.connections.{$connectionName}" => [
 				'driver' => 'sqlite',
-				'database' => $this->getStorePath(),
+				'database' => $storePath,
 				'prefix' => '',
 				'foreign_key_constraints' => true,
 			]]);
@@ -197,7 +206,28 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 		$this->connect();
 		
 		$this->validateTableName($tableName);
-		$this->db->table($tableName)->insert($rows);
+		
+		// Use INSERT OR REPLACE for SQLite to handle duplicates gracefully
+		if (empty($rows)) {
+			return $this;
+		}
+		
+		// Get column names from first row
+		$columns = array_keys($rows[0]);
+		$placeholders = '(' . implode(',', array_fill(0, count($columns), '?')) . ')';
+		$values = [];
+		
+		foreach ($rows as $row) {
+			foreach ($columns as $column) {
+				$values[] = $row[$column] ?? null;
+			}
+		}
+		
+		// Build INSERT OR REPLACE query
+		$sql = "INSERT OR REPLACE INTO `{$tableName}` (`" . implode('`, `', $columns) . "`) VALUES ";
+		$sql .= implode(', ', array_fill(0, count($rows), $placeholders));
+		
+		$this->db->statement($sql, $values);
 		
 		return $this;
 	}

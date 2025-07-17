@@ -131,6 +131,7 @@ class ImporterCommand extends Command
 			if ($driverClass == AutoDriver::class) {
 				throw new CompatibleDriverNotFoundException();
 			}
+//			return;
 		}
 
 		$this->info(__('importer::importer.import.using_driver', ['driver' => $driverClass]));
@@ -201,7 +202,8 @@ class ImporterCommand extends Command
 
             if ($stateMachine->canTransitionTo($nextState)) {
                 $originalDriver = $record->driver;
-//				dd($originalDriver, $record->driver);
+                
+                // Transition to next state
                 $stateMachine->transitionTo($nextState);
                 $record->refresh();
 
@@ -214,12 +216,50 @@ class ImporterCommand extends Command
                 $record->refresh();
                 $currentStateClass = $record->state;
                 $this->info("✓ Transitioned to: " . class_basename($currentStateClass));
+                
+                // Execute state processing logic (simulate Filament form processing)
+                $this->executeStateProcessing($record, $currentStateClass);
+                
             } else {
                 $this->error("❌ Cannot transition to: " . class_basename($nextState));
                 break;
             }
 
             $iterations++;
+        }
+    }
+
+    protected function executeStateProcessing(ImportContract $record, string $stateClass): void
+    {
+        try {
+            $this->info("🔄 Executing processing for: " . class_basename($stateClass));
+            
+            // Get the state instance
+            $stateMachine = $record->getStateMachine();
+            $state = $stateMachine->getCurrentState();
+            
+            // Execute state-specific processing logic
+            if (method_exists($state, 'handleFilamentFormSave')) {
+                // For states that have Filament form processing (like ExtractState, CreateStorageState)
+                $this->info("  → Running form save logic...");
+                $state->handleFilamentFormSave([], $record);
+                $this->info("  ✓ Form processing completed");
+                
+            } elseif (method_exists($state, 'performProcessing')) {
+                // For states that have custom processing methods
+                $this->info("  → Running custom processing...");
+                $state->performProcessing($record);
+                $this->info("  ✓ Custom processing completed");
+                
+            } else {
+                // For states that only use onEnter (already called by transitionTo)
+                $this->info("  → State transition completed (no additional processing needed)");
+            }
+            
+        } catch (\Exception $e) {
+            $this->error("❌ State processing failed: " . $e->getMessage());
+            $this->error("   " . $e->getFile() . ":" . $e->getLine());
+            throw $e;
         }
     }
 
@@ -285,7 +325,6 @@ class ImporterCommand extends Command
             $dbSize = $storage->getSize();
             $this->info("Database Path: <info>{$dbPath}</info>");
             $this->info("Database Size: <info>" . $this->formatBytes($dbSize) . "</info>");
-            
             // Get tables and their row counts
             $tables = $storage->getTables();
             $totalRows = 0;

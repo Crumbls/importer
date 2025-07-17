@@ -8,6 +8,12 @@ use Crumbls\Importer\Models\Import;
 use Crumbls\Importer\States\CreateStorageState;
 use Crumbls\Importer\States\WpXmlDriver\ExtractState;
 use Crumbls\Importer\States\WpXmlDriver\AnalyzingState;
+use Crumbls\Importer\States\WpXmlDriver\MappingState;
+use Crumbls\Importer\States\WpXmlDriver\ModelCreationState;
+use Crumbls\Importer\States\WpXmlDriver\ModelCustomizationState;
+use Crumbls\Importer\States\WpXmlDriver\MigrationBuilderState;
+use Crumbls\Importer\States\WpXmlDriver\FactoryBuilderState;
+use Crumbls\Importer\States\WpXmlDriver\TransformReviewState;
 use Crumbls\Importer\States\Shared\ConfigureModelsState;
 use Crumbls\Importer\Support\SourceResolverManager;
 use Crumbls\Importer\Resolvers\FileSourceResolver;
@@ -45,7 +51,9 @@ class WpXmlDriver extends XmlDriver
 		if (!XmlDriver::canHandle($import)) {
 			return false;
 		}
-return true;
+
+		return true;
+
 		try {
 
 			$manager = new SourceResolverManager();
@@ -79,6 +87,7 @@ return true;
 		return (new DriverConfig())
 			->default(PendingState::class)
 
+			// Extract phase transitions
 			->allowTransition(PendingState::class, CreateStorageState::class)
 			->allowTransition(PendingState::class, FailedState::class)
 
@@ -88,18 +97,40 @@ return true;
 			->allowTransition(ExtractState::class, AnalyzingState::class)
 			->allowTransition(ExtractState::class, FailedState::class)
 
-//			->allowTransition(AnalyzingState::class, ConfigureModelsState::class)
+			// Transform phase transitions (ETL flow)
+			->allowTransition(AnalyzingState::class, MappingState::class)
 			->allowTransition(AnalyzingState::class, FailedState::class)
 
-//			->allowTransition(ConfigureModelsState::class, CompletedState::class)
-//			->allowTransition(ConfigureModelsState::class, FailedState::class)
+			->allowTransition(MappingState::class, ModelCreationState::class)
+			->allowTransition(MappingState::class, FailedState::class)
 
+			->allowTransition(ModelCreationState::class, ModelCustomizationState::class)
+			->allowTransition(ModelCreationState::class, FailedState::class)
 
+			->allowTransition(ModelCustomizationState::class, MigrationBuilderState::class)
+			->allowTransition(ModelCustomizationState::class, FailedState::class)
+
+			->allowTransition(MigrationBuilderState::class, FactoryBuilderState::class)
+			->allowTransition(MigrationBuilderState::class, FailedState::class)
+
+			->allowTransition(FactoryBuilderState::class, TransformReviewState::class)
+			->allowTransition(FactoryBuilderState::class, FailedState::class)
+
+			// Load phase transitions (future implementation)
+			->allowTransition(TransformReviewState::class, CompletedState::class)
+			->allowTransition(TransformReviewState::class, FailedState::class)
+
+			// Preferred transitions (ETL flow)
 			->preferredTransition(PendingState::class, CreateStorageState::class)
 			->preferredTransition(CreateStorageState::class, ExtractState::class)
 			->preferredTransition(ExtractState::class, AnalyzingState::class)
-//			->preferredTransition(AnalyzingState::class, ConfigureModelsState::class)
-//			->preferredTransition(ConfigureModelsState::class, CompletedState::class)
+			->preferredTransition(AnalyzingState::class, MappingState::class)
+			->preferredTransition(MappingState::class, ModelCreationState::class)
+			->preferredTransition(ModelCreationState::class, ModelCustomizationState::class)
+			->preferredTransition(ModelCustomizationState::class, MigrationBuilderState::class)
+			->preferredTransition(MigrationBuilderState::class, FactoryBuilderState::class)
+			->preferredTransition(FactoryBuilderState::class, TransformReviewState::class)
+			->preferredTransition(TransformReviewState::class, CompletedState::class)
 ;
 	}
 

@@ -84,5 +84,12 @@ return [
     */
     'models' => [
         'import' => \Crumbls\Importer\Models\Import::class,
+        
+        // WordPress-specific overrides (only if different from convention)
+        'attachment' => 'media', // WordPress attachment maps to Media model
+        'nav_menu_item' => 'menu_item', // WordPress nav_menu_item maps to MenuItem model
+        
+        // Other specific mappings can be added here as needed
+        // Most models will be auto-resolved using app namespace + studly case
     ],
 ];

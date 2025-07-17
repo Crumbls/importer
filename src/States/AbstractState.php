@@ -99,12 +99,41 @@ abstract class AbstractState extends State implements ImportStateContract, HasAc
     public function getImport(): ImportContract
     {
         $context = $this->getContext();
-        
+
         if (!is_array($context) || !array_key_exists('model', $context)) {
-            throw new \RuntimeException('Import contract not available in state context');
+            // Try to get the import from the state machine itself
+            if (isset($this->stateMachine) && method_exists($this->stateMachine, 'getContext')) {
+                $context = $this->stateMachine->getContext();
+                if (is_array($context) && array_key_exists('model', $context)) {
+                    return $context['model'];
+                }
+            }
+            
+            
+            throw new \RuntimeException('Import contract not available in state context. Context: ' . json_encode($context));
         }
-        
+
         return $context['model'];
+    }
+    
+    /**
+     * Get state data from the import metadata
+     */
+    public function getStateData(string $key)
+    {
+        $import = $this->getImport();
+        return $import->metadata[$key] ?? null;
+    }
+    
+    /**
+     * Set state data in the import metadata
+     */
+    public function setStateData(string $key, $value): void
+    {
+        $import = $this->getImport();
+        $metadata = $import->metadata ?? [];
+        $metadata[$key] = $value;
+        $import->update(['metadata' => $metadata]);
     }
 
     // =========================================================================
@@ -306,7 +335,7 @@ abstract class AbstractState extends State implements ImportStateContract, HasAc
             if ($nextState) {
                 // Get the state machine and transition
                 $stateMachine = $record->getStateMachine();
-                $stateMachine->transitionTo($nextState);
+                $stateMachine->transitionTo($nextState, $this->getContext());
 
                 // Update the record with new state
                 $record->update(['state' => $nextState]);
