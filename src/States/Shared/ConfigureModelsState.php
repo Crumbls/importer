@@ -28,7 +28,7 @@ class ConfigureModelsState extends AbstractState {
 
     public function form(Form $form): Form
     {
-        $import = $this->getImport();
+        $import = $this->getRecord();
         $metadata = $import->metadata ?? [];
         $modelConfiguration = $metadata['model_configuration'] ?? [];
 
@@ -55,7 +55,7 @@ class ConfigureModelsState extends AbstractState {
 
     public function infolist(Infolist $infolist): Infolist
     {
-        $import = $this->getImport();
+        $import = $this->getRecord();
         $metadata = $import->metadata ?? [];
         $analysisResults = $metadata['analysis_results'] ?? [];
         $modelConfiguration = $metadata['model_configuration'] ?? [];
@@ -119,7 +119,7 @@ class ConfigureModelsState extends AbstractState {
     
     public function onEnter(): void
     {
-        $import = $this->getImport();
+        $import = $this->getRecord();
         if (!$import instanceof ImportContract) {
             throw new \RuntimeException('Import contract not found in context');
         }

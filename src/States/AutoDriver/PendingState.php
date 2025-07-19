@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\States\AutoDriver;
 
+use Crumbls\Importer\Console\Prompts\AutoDriver\PendingStatePrompt;
 use Crumbls\Importer\Filament\Resources\ImportResource;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\States\PendingState as BaseState;
@@ -96,5 +97,22 @@ class PendingState extends BaseState
         $page->redirect($page->getResourceUrl('step', ['record' => $page->record]));
     }
 
+
+	public static function getCommandPrompt() : string {
+		return PendingStatePrompt::class;
+	}
+
+	public function onEnter() : void {
+	}
+
+	public function execute() : bool {
+		$record = $this->getRecord();
+		$this->transitionToNextState($record);
+		return true;
+	}
+
+	public function onExit() : void {
+
+	}
 
 }

@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\Console\Prompts;
 
+use Crumbls\Importer\Console\Prompts\AbstractPrompt;
 use Crumbls\Importer\Traits\IsDiskAware;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
@@ -11,7 +12,7 @@ use function Laravel\Prompts\info;
 use function Laravel\Prompts\table;
 use function Laravel\Prompts\confirm;
 
-class FileBrowserPrompt
+class FileBrowserPrompt extends AbstractPrompt
 {
 	use IsDiskAware;
 
@@ -20,14 +21,12 @@ class FileBrowserPrompt
     protected array $availableDisks = [];
     protected ?string $selectedFile = null;
 
-    public function __construct(protected Command $command)
+    public function render(string $initialDisk = 'local'): ?string
     {
-    }
+	    $this->clearScreen();
 
-    public function browse(string $initialDisk = 'local'): ?string
-    {
 
-        if (in_array($initialDisk, $this->availableDisks)) {
+	    if (in_array($initialDisk, $this->availableDisks)) {
             $this->currentDisk = $initialDisk;
         }
 

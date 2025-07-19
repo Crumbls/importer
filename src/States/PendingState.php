@@ -6,8 +6,9 @@ abstract class PendingState extends AbstractState
 {
     public function onEnter(): void
     {
+		return;
         // Update the import record when entering pending state
-        if ($import = $this->getImport()) {
+        if ($import = $this->getRecord()) {
 	        $import->update([
 		        'state' => __CLASS__,
                 'started_at' => null,

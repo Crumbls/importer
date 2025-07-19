@@ -5,6 +5,7 @@ namespace Crumbls\Importer\States\WordPressDriver;
 use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\Services\ModelGenerator;
 use Crumbls\Importer\Filament\Pages\GenericFormPage;
+use Crumbls\Importer\States\WordPressDriver\ModelCustomizationState;
 use Filament\Schemas\Schema;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\TextInput;
@@ -44,10 +45,8 @@ class ModelCreationState extends AbstractState
     {
         $this->prepareModelCreationData();
         
-        // Check if we can auto-skip this state
-        if ($this->shouldAutoSkip()) {
-            $this->handleAutoSkip();
-        }
+        // Note: Auto-skip logic moved to form save handler to avoid duplicate transitions
+        // The shouldAutoSkip() and handleAutoSkip() methods are still available for CLI usage
     }
     
     protected function shouldAutoSkip(): bool
@@ -277,6 +276,12 @@ class ModelCreationState extends AbstractState
     public function handleFilamentFormSave(array $data): void
     {
         try {
+            // Check if we should auto-skip this state
+            if ($this->shouldAutoSkip()) {
+                $this->handleAutoSkip();
+                return;
+            }
+            
             $results = [];
             
             foreach ($data['models'] as $modelData) {
@@ -296,7 +301,7 @@ class ModelCreationState extends AbstractState
             $this->setStateData('model_creation_results', $results);
             $this->updateModelMappings($data['models']);
             
-            $this->transitionTo(ExecuteState::class);
+            $this->transitionTo(ModelCustomizationState::class);
             
         } catch (\Exception $e) {
             $this->setStateData('creation_error', $e->getMessage());

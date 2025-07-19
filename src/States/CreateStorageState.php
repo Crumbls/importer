@@ -20,65 +20,8 @@ class CreateStorageState extends AbstractState
 {
 	use AutoTransitionsTrait;
 
-    /**
-     * Use the form page for auto-transitions
-     */
-    public function getRecommendedPageClass(): string
+    private function createStorage(ImportContract$import): void
     {
-        return GenericFormPage::class;
-    }
-
-    // Filament UI Implementation
-    public function getTitle(ImportContract $record): string
-    {
-        return 'Setting Up Storage';
-    }
-
-    public function getHeading(ImportContract $record): string
-    {
-        return 'Creating Temporary Storage';
-    }
-
-    public function getSubheading(ImportContract $record): ?string
-    {
-        return 'Setting up optimized SQLite database for processing your import...';
-    }
-
-    public function hasFilamentForm(): bool
-    {
-        return true;
-    }
-
-    public function buildForm(Schema $schema, ImportContract $record): Schema
-    {
-        return $schema->schema([]);
-    }
-
-    public function getHeaderActions(ImportContract $record): array
-    {
-        return [
-            Action::make('cancel')
-                ->label('Cancel')
-                ->icon('heroicon-o-x-mark')
-                ->color('gray')
-                ->url(fn() => route('filament.admin.resources.imports.index')),
-        ];
-    }
-
-    public function handleSave(array $data, ImportContract $record): void
-    {
-        // This method is called when the form is auto-submitted
-        $this->createStorage($record);
-        $this->transitionToNextState($record);
-    }
-
-    private function createStorage($import): void
-    {
-        try {
-            if (!$import instanceof ImportContract) {
-                throw new \RuntimeException('Import contract not found in context');
-            }
-
             $metadata = $import->metadata ?? [];
             $updated = false;
 
@@ -156,100 +99,15 @@ class CreateStorageState extends AbstractState
             DB::connection($connectionName)->statement('CREATE TABLE IF NOT EXISTS connection_test (id INTEGER)');
             DB::connection($connectionName)->statement('DROP TABLE connection_test');
 
-            Notification::make()
-                ->title('Storage Created Successfully!')
-                ->body('Temporary SQLite database is ready for processing.')
-                ->success()
-                ->send();
-
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Storage Creation Failed')
-                ->body('Failed to create storage: ' . $e->getMessage())
-                ->danger()
-                ->send();
-            throw $e;
-        }
-    }
-
-    protected function transitionToNextState($record): void
-    {
-        try {
-            // Get the driver and its preferred transitions
-            $driver = $record->getDriver();
-            $config = $driver->config();
-            
-            // Get the next preferred state from current state
-            $nextState = $config->getPreferredTransition(static::class);
-            
-            if ($nextState) {
-                // Get the state machine and transition
-                $stateMachine = $record->getStateMachine();
-                $stateMachine->transitionTo($nextState);
-                
-                // Update the record with new state
-                $record->update(['state' => $nextState]);
-                
-                Notification::make()
-                    ->title('Storage Created!')
-                    ->body('Temporary storage created successfully.')
-                    ->success()
-                    ->send();
-            } else {
-                throw new \Exception('No preferred transition found from CreateStorageState');
-            }
-            
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Transition Failed')
-                ->body('Failed to proceed to next state: ' . $e->getMessage())
-                ->danger()
-                ->send();
-        }
-    }
-
-    public function onEnter(): void
-    {
-        // For auto-transitions, we need to create storage immediately
-        if ($this->hasAutoTransition()) {
-            $this->performStorageCreation();
-        }
     }
     
-    protected function performStorageCreation(): void
+    public function execute(): bool
     {
-        $import = $this->getImport();
+        $record = $this->getRecord();
         
-        // Create the storage
-        $storeName = $this->getStoreName($import);
-        $storage = Storage::driver('sqlite')->createOrFindStore($storeName);
-        
-        // Update metadata with storage driver info
-        $metadata = $import->metadata ?? [];
-        $metadata['storage_driver'] = 'sqlite';
-        $metadata['storage_path'] = $storage->getStorePath();
-        $metadata['storage_connection'] = 'import_' . uniqid();
-        $metadata['storage_created_at'] = now()->toISOString();
-        
-        $import->update(['metadata' => $metadata]);
-    }
-    
-    /**
-     * Override shouldAutoTransition to check if storage creation is complete
-     */
-    public function shouldAutoTransition(ImportContract $record): bool
-    {
-        if (!$this->hasAutoTransition()) {
-            return false;
-        }
-        
-        // Check if storage was created successfully
-        $metadata = $record->metadata ?? [];
-        $storageCreated = isset($metadata['storage_driver']) && !empty($metadata['storage_driver']);
-        
-        if (!$storageCreated) {
-            return false;
-        }
+	    $this->createStorage($record);
+
+	    $this->transitionToNextState($record);
 
 		return true;
     }

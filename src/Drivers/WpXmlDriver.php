@@ -8,12 +8,12 @@ use Crumbls\Importer\Models\Import;
 use Crumbls\Importer\States\CreateStorageState;
 use Crumbls\Importer\States\WpXmlDriver\ExtractState;
 use Crumbls\Importer\States\WpXmlDriver\AnalyzingState;
-use Crumbls\Importer\States\WpXmlDriver\MappingState;
-use Crumbls\Importer\States\WpXmlDriver\ModelCreationState;
-use Crumbls\Importer\States\WpXmlDriver\ModelCustomizationState;
-use Crumbls\Importer\States\WpXmlDriver\MigrationBuilderState;
-use Crumbls\Importer\States\WpXmlDriver\FactoryBuilderState;
-use Crumbls\Importer\States\WpXmlDriver\TransformReviewState;
+use Crumbls\Importer\States\WordPressDriver\MappingState;
+use Crumbls\Importer\States\WordPressDriver\ModelCreationState;
+use Crumbls\Importer\States\WordPressDriver\ModelCustomizationState;
+use Crumbls\Importer\States\WordPressDriver\MigrationBuilderState;
+use Crumbls\Importer\States\WordPressDriver\FactoryBuilderState;
+use Crumbls\Importer\States\WordPressDriver\TransformReviewState;
 use Crumbls\Importer\States\Shared\ConfigureModelsState;
 use Crumbls\Importer\Support\SourceResolverManager;
 use Crumbls\Importer\Resolvers\FileSourceResolver;
@@ -43,6 +43,7 @@ class WpXmlDriver extends XmlDriver
 	{
 		return 90;
 	}
+
 	/**
 	 * @param ImportContract $import
 	 * @return bool
@@ -102,9 +103,11 @@ class WpXmlDriver extends XmlDriver
 			->allowTransition(AnalyzingState::class, FailedState::class)
 
 			->allowTransition(MappingState::class, ModelCreationState::class)
+			->allowTransition(MappingState::class, ModelCustomizationState::class)
 			->allowTransition(MappingState::class, FailedState::class)
 
 			->allowTransition(ModelCreationState::class, ModelCustomizationState::class)
+			->allowTransition(ModelCreationState::class, MappingState::class)
 			->allowTransition(ModelCreationState::class, FailedState::class)
 
 			->allowTransition(ModelCustomizationState::class, MigrationBuilderState::class)

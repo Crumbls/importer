@@ -208,7 +208,7 @@ class AnalyzingState extends AbstractState
     
     public function onEnter(): void
     {
-        $import = $this->getImport();
+        $import = $this->getRecord();
 
         $metadata = $import->metadata ?? [];
 
@@ -227,6 +227,111 @@ class AnalyzingState extends AbstractState
         $import->update([
             'metadata' => $metadata
         ]);
+        
+        // Prepare analysis data for the mapping state
+        $this->prepareAnalysisForMappingState($metadata);
+    }
+    
+    /**
+     * Prepare analysis data for the mapping state
+     */
+    protected function prepareAnalysisForMappingState(array $metadata): void
+    {
+        $dataMap = $metadata['data_map'] ?? [];
+        
+        // Transform the data structure for the mapping state
+        $analysisData = [
+            'post_types' => $this->extractPostTypes($dataMap),
+            'meta_fields' => $this->extractMetaFields($dataMap),
+            'post_columns' => $this->extractPostColumns($dataMap),
+            'field_analysis' => $dataMap, // Keep original for reference
+            'extraction_stats' => $metadata['parsing_stats'] ?? [],
+        ];
+        
+        // Store in state data for next states
+        $this->setStateData('analysis', $analysisData);
+    }
+    
+    /**
+     * Extract post types from data map
+     */
+    protected function extractPostTypes(array $dataMap): array
+    {
+        $postTypes = [];
+        
+        // Get the storage driver to analyze post types
+        $storage = $this->getStorageDriver();
+        
+        if ($storage && method_exists($storage, 'db')) {
+            $connection = $storage->db();
+            
+            // Get post type counts
+            $postTypeCounts = $connection->table('posts')
+                ->select('post_type')
+                ->selectRaw('COUNT(*) as count')
+                ->groupBy('post_type')
+                ->get()
+                ->pluck('count', 'post_type')
+                ->toArray();
+                
+            foreach ($postTypeCounts as $postType => $count) {
+                $postTypes[$postType] = [
+                    'count' => $count,
+                    'type' => $postType,
+                    'description' => ucfirst($postType) . ' content type',
+                ];
+            }
+        }
+        
+        return $postTypes;
+    }
+    
+    /**
+     * Extract meta fields from data map
+     */
+    protected function extractMetaFields(array $dataMap): array
+    {
+        $metaFields = [];
+        
+        foreach ($dataMap as $field) {
+            if (($field['field_type'] ?? '') === 'meta_field') {
+                $metaFields[] = $field;
+            }
+        }
+        
+        return $metaFields;
+    }
+    
+    /**
+     * Extract post columns from data map
+     */
+    protected function extractPostColumns(array $dataMap): array
+    {
+        $postColumns = [];
+        
+        foreach ($dataMap as $field) {
+            if (($field['field_type'] ?? '') === 'post_column') {
+                $postColumns[] = $field;
+            }
+        }
+        
+        return $postColumns;
+    }
+    
+    /**
+     * Get the storage driver from metadata
+     */
+    protected function getStorageDriver()
+    {
+        $import = $this->getRecord();
+        $metadata = $import->metadata ?? [];
+        
+        if (!isset($metadata['storage_driver'])) {
+            return null;
+        }
+        
+        return Storage::driver($metadata['storage_driver'])
+            ->configureFromMetadata($metadata);
     }
 
     /**

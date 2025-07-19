@@ -10,7 +10,7 @@ class ProcessingState extends AbstractState
 {
     public function onEnter(): void
     {
-        $import = $this->getImport();
+        $import = $this->getRecord();
         if (!$import instanceof ImportContract) {
             throw new \RuntimeException('Import contract not found in context');
         }

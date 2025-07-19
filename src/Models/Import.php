@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Throwable;
 
 class Import extends Model implements ImportContract
@@ -232,5 +233,37 @@ class Import extends Model implements ImportContract
 
 	public function user() : BelongsTo {
 		return $this->belongsTo(ModelResolver::user());
+	}
+	
+	/**
+	 * Get the model mappings for this import
+	 */
+	public function modelMaps(): HasMany
+	{
+		return $this->hasMany(ModelResolver::importModelMap());
+	}
+	
+	/**
+	 * Get active model mappings for this import
+	 */
+	public function activeMaps()
+	{
+		return $this->modelMaps()->active();
+	}
+	
+	/**
+	 * Get model mappings for a specific driver
+	 */
+	public function mapsForDriver(string $driver)
+	{
+		return $this->modelMaps()->forDriver($driver);
+	}
+	
+	/**
+	 * Get model mappings for a specific source table
+	 */
+	public function mapsForTable(string $table)
+	{
+		return $this->modelMaps()->forSourceTable($table);
 	}
 }

@@ -4,12 +4,14 @@ declare(strict_types = 1);
 
 namespace Crumbls\Importer\Console;
 
-use Crumbls\Importer\States\PendingState;
+use Crumbls\Importer\Console\Prompts\CreateImportPrompt;
+use Crumbls\Importer\Console\Prompts\ListImportsPrompt;
+use Crumbls\Importer\States\AutoDriver\PendingState;
 use Crumbls\Importer\Traits\IsDiskAware;
 use Illuminate\Support\Str;
 use function Laravel\Prompts\text;
 
-use Crumbls\Importer\Console\Prompts\FileBrowserPrompt;
+use Crumbls\Importer\Console\Prompts\Sources\FileBrowserPrompt;
 use Crumbls\Importer\Drivers\AutoDriver;
 use Crumbls\Importer\Exceptions\CompatibleDriverNotFoundException;
 use Crumbls\Importer\Exceptions\InputNotProvided;
@@ -33,73 +35,32 @@ class ImporterCommand extends Command
 
     public function handle(): int
     {
-        /**
-         * Clean up.
-         */
-        Import::all()->each(function (Import $import) {
+	    /**
+	     * Clean up.
+	     */
+	    Import::all()->each(function (Import $import) {
 //            $import->delete();
-        });
-	    $record = Import::find(427);
-	    if ($record) {
-		    $record->driver = AutoDriver::class;
-		    $record->state = \Crumbls\Importer\States\AutoDriver\PendingState::class;
-		    $record->save();
-//return 1;
-			$this->handleRecord($record);
-	    }
+	    });
 
-		return 1;
-//		exit;
+		$record = Import::find(427);
+	    $record->driver = AutoDriver::class;
+		$record->state = PendingState::class;
+		$record->metadata = null;
+	    $record->error_message = null;
+		$record->save();
+	    $record->clearStateMachine();
 
-        $this->info(__('importer::importer.command.ready'));
 
-	    $sourceType = null;
-	    $source = $this->argument('input');
-		$root = null;
-
-        if (!$source) {
-            $browser = new FileBrowserPrompt($this);
-            $selectedFile = $browser->browse();
-			$sourceType = 'storage';
-
-            if (!$selectedFile) {
-                $this->info('No file selected. Using random file fallback.');
-                [$root, $source] = $this->getRandomFile();
-                $this->info("Randomly selected: {$sourceType} -> {$source}");
-            } else {
-	            [$root, $source] = explode('::', $selectedFile, 2);
-            }
-        } else {
-			if (preg_match('#^(.*?):{1,2}(.*?)$#', $source, $matches)) {
-				$disks = $this->getAvailableDisks();
-				if (in_array($matches[1], $disks)) {
-					$sourceType = 'storage';
-					$root = $matches[1];
-					$source = $matches[2];
-				} else {
-					throw ImportException::invalidSourceFormat($source);
-				}
-			} else {
-				throw ImportException::sourceNotFound($source);
-			}
-        }
-
-        if (!$source) {
-            throw new InputNotProvided();
-        }
-
-        $record = null;
-
-		$method = Str::camel('handle source '.$sourceType);
-
-		if (!method_exists($this, $method)) {
-			throw ImportException::driverNotFound($sourceType);
-		}
-
-		$record = $this->$method($root, $source);
+	    $prompt = new ListImportsPrompt($this);
+	    $record = $prompt->render();
 
 		if (!$record) {
-			throw new Exception('File not found....');
+			$prompt = new CreateImportPrompt($this);
+			$record = $prompt->render();
+			if (!$record) {
+				$this->info('Cancelled.');
+				return 0;
+			}
 		}
 
 		$this->handleRecord($record);
@@ -108,6 +69,8 @@ class ImporterCommand extends Command
     }
 
 	protected function handleRecord(ImportContract $record) : void {
+
+		$this->clearScreen();
 
 		$message = $record->wasRecentlyCreated ? 'importer::importer.import.created' : 'importer::importer.import.loaded';
 
@@ -123,7 +86,6 @@ class ImporterCommand extends Command
 			$this->processDriver($record);
 
 			$record->refresh();
-
 			$driver = $record->getDriver();
 
 			$driverClass = get_class($driver);
@@ -131,14 +93,18 @@ class ImporterCommand extends Command
 			if ($driverClass == AutoDriver::class) {
 				throw new CompatibleDriverNotFoundException();
 			}
-//			return;
+
+			$record->clearStateMachine();
 		}
+
+		$this->clearScreen();
+
 
 		$this->info(__('importer::importer.import.using_driver', ['driver' => $driverClass]));
 
 		$this->processDriver($record);
 
-		$this->displayDatabaseStats($record);
+//		$this->displayDatabaseStats($record);
 
 	}
 
@@ -167,101 +133,82 @@ class ImporterCommand extends Command
 	}
 
 
-    protected function processDriver(ImportContract $record) : void {
+    protected function processDriver(ImportContract $record): void 
+    {
+        $this->clearScreen();
         $record->clearStateMachine();
-
+        
         $stateMachine = $record->getStateMachine();
-
         $driverConfigClass = $record->driver;
-
         $preferredTransitions = $driverConfigClass::config()->getPreferredTransitions();
-
+        
         if (empty($preferredTransitions)) {
             $this->error('No preferred transitions defined for this driver');
             return;
         }
 
+        // Set initial state if needed
         $currentStateClass = $record->state;
-//dd($currentStateClass);
-        // If no state is set, use the default state from driver config
+
         if (!$currentStateClass) {
             $currentStateClass = $driverConfigClass::config()->getDefaultState();
             if ($currentStateClass) {
+                $stateMachine->transitionTo($currentStateClass);
                 $record->update(['state' => $currentStateClass]);
                 $record->refresh();
             }
         }
 
         $iterations = 0;
-        $maxIterations = 10;
+        $maxIterations = 50;
 
-        while (array_key_exists($currentStateClass, $preferredTransitions) && $iterations < $maxIterations) {
-            $nextState = $preferredTransitions[$currentStateClass];
-            $this->info("Current state: " . class_basename($currentStateClass));
-            $this->info("Next state: " . class_basename($nextState));
-
-            if ($stateMachine->canTransitionTo($nextState)) {
-                $originalDriver = $record->driver;
-                
-                // Transition to next state
-                $stateMachine->transitionTo($nextState);
-                $record->refresh();
-
-                if ($record->driver !== $originalDriver) {
-                    $this->info("✓ Driver changed to: " . class_basename($record->driver));
-                    break; // Stop processing, let the command handle the new driver
-                }
-
-                $record->update(['state' => $nextState]);
-                $record->refresh();
-                $currentStateClass = $record->state;
-                $this->info("✓ Transitioned to: " . class_basename($currentStateClass));
-                
-                // Execute state processing logic (simulate Filament form processing)
-                $this->executeStateProcessing($record, $currentStateClass);
-                
-            } else {
-                $this->error("❌ Cannot transition to: " . class_basename($nextState));
+        // Main state processing loop
+        while ($currentStateClass && $iterations < $maxIterations) {
+            $this->clearScreen();
+            $this->info("Processing state: " . class_basename($currentStateClass));
+            
+            // 1. Show state prompt
+            $promptClass = $currentStateClass::getCommandPrompt();
+            $prompt = new $promptClass($this, $record);
+            $result = $prompt->render();
+            
+            // 2. Execute state logic  
+            $state = $stateMachine->getCurrentState();
+            $originalDriver = $record->driver;
+            $originalStateClass = $currentStateClass;
+            
+            if (!$state->execute()) {
+                $this->error("State execution failed");
                 break;
             }
-
-            $iterations++;
-        }
-    }
-
-    protected function executeStateProcessing(ImportContract $record, string $stateClass): void
-    {
-        try {
-            $this->info("🔄 Executing processing for: " . class_basename($stateClass));
             
-            // Get the state instance
-            $stateMachine = $record->getStateMachine();
-            $state = $stateMachine->getCurrentState();
+            // 3. Check if state or driver changed during execution
+            $record->refresh();
             
-            // Execute state-specific processing logic
-            if (method_exists($state, 'handleFilamentFormSave')) {
-                // For states that have Filament form processing (like ExtractState, CreateStorageState)
-                $this->info("  → Running form save logic...");
-                $state->handleFilamentFormSave([], $record);
-                $this->info("  ✓ Form processing completed");
-                
-            } elseif (method_exists($state, 'performProcessing')) {
-                // For states that have custom processing methods
-                $this->info("  → Running custom processing...");
-                $state->performProcessing($record);
-                $this->info("  ✓ Custom processing completed");
-                
-            } else {
-                // For states that only use onEnter (already called by transitionTo)
-                $this->info("  → State transition completed (no additional processing needed)");
+            // Check if driver changed during execution
+            if ($record->driver !== $originalDriver) {
+                $this->info("✓ Driver changed to: " . class_basename($record->driver));
+                break; // Stop processing, let the command handle the new driver
             }
             
-        } catch (\Exception $e) {
-            $this->error("❌ State processing failed: " . $e->getMessage());
-            $this->error("   " . $e->getFile() . ":" . $e->getLine());
-            throw $e;
+            // Check if state changed during execution
+            $newStateClass = $record->state;
+            if ($newStateClass !== $originalStateClass) {
+                $currentStateClass = $newStateClass;
+            } else {
+                break;
+            }
+            
+            $iterations++;
+        }
+        
+        if ($iterations >= $maxIterations) {
+            $this->error("Maximum iterations reached - possible infinite loop detected");
+        } else {
+            $this->info("State machine processing complete.");
         }
     }
+
 
     protected function getRandomFile(): array
     {
@@ -308,7 +255,7 @@ class ImporterCommand extends Command
             $metadata = $import->metadata ?? [];
             
             if (!isset($metadata['storage_driver'])) {
-                $this->info('No storage driver found in metadata');
+                $this->info('1No storage driver found in metadata');
                 return;
             }
 
@@ -586,5 +533,8 @@ class ImporterCommand extends Command
         return implode(', ', $info) ?: '-';
     }
 
+	protected function clearScreen() : void {
+		$this->getOutput()->write("\033[2J\033[H");
+	}
 
 }

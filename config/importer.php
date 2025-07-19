@@ -84,6 +84,7 @@ return [
     */
     'models' => [
         'import' => \Crumbls\Importer\Models\Import::class,
+        'importmodelmap' => \Crumbls\Importer\Models\ImportModelMap::class,
         
         // WordPress-specific overrides (only if different from convention)
         'attachment' => 'media', // WordPress attachment maps to Media model

@@ -55,9 +55,6 @@ class ModelResolver
     protected static function resolveModel(string $key): string
     {
 		$key = strtolower($key);
-		return once(function() use ($key){
-
-	        // Get model class from config
 	        /** @var class-string<Model>|null $modelClass */
 	        $modelClass = Config::get("importer.models.{$key}");
 
@@ -78,7 +75,7 @@ class ModelResolver
 	        }
 
 	        return $modelClass;
-		});
+
     }
     
     public static function clearCache(): void

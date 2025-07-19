@@ -5,6 +5,10 @@ namespace Crumbls\Importer\States\WordPressDriver;
 use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\Services\ModelScanner;
 use Crumbls\Importer\Filament\Pages\GenericFormPage;
+use Crumbls\Importer\Resolvers\ModelResolver;
+use Crumbls\Importer\Models\Contracts\ImportContract;
+use Crumbls\Importer\States\WordPressDriver\ModelCreationState;
+use Crumbls\Importer\States\WordPressDriver\ModelCustomizationState;
 use Filament\Schemas\Schema;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -37,17 +41,20 @@ class MappingState extends AbstractState
     
     public function canEnter(): bool
     {
-        return $this->getStateData('analysis') !== null;
+        // Check if the import has required data for mapping
+        $import = $this->getRecord();
+        $metadata = $import->metadata ?? [];
+        
+        // Ensure we have analyzed data to work with
+        return isset($metadata['data_map']) && !empty($metadata['data_map']);
     }
     
     public function onEnter(): void
     {
         $this->generateModelMappings();
         
-        // Check if we can auto-skip this state
-        if ($this->shouldAutoSkip()) {
-            $this->handleAutoSkip();
-        }
+        // Note: Auto-skip logic moved to CLI handling to avoid duplicate transitions
+        // The shouldAutoSkip() and handleAutoSkip() methods are still available for CLI usage
     }
     
     protected function shouldAutoSkip(): bool
@@ -84,7 +91,8 @@ class MappingState extends AbstractState
         
         // Determine next state based on whether models need to be created
         $unmappedTypes = $this->getUnmappedPostTypes($mappingData['mappings']);
-        
+
+		dd($unmappedTypes);
         if (!empty($unmappedTypes)) {
             $this->setStateData('unmapped_for_creation', $unmappedTypes);
             $this->transitionTo(ModelCreationState::class);
@@ -95,7 +103,6 @@ class MappingState extends AbstractState
     
     protected function generateModelMappings(): void
     {
-
         $analysisData = $this->getStateData('analysis');
         
         if (!$analysisData || !isset($analysisData['post_types'])) {
@@ -103,22 +110,38 @@ class MappingState extends AbstractState
             return;
         }
         
+        $import = $this->getRecord();
         $postTypes = $analysisData['post_types'];
-
-		$scanner = $this->getModelScanner();
-
+        $scanner = $this->getModelScanner();
+        
+        // Clear existing mappings for this import (force delete to avoid unique constraint issues)
+        $import->modelMaps()->forceDelete();
+        
+        // Generate model matches and suggestions
         $modelMatches = $scanner->findModelMatches($postTypes);
         $suggestions = $scanner->suggestModelNames(array_keys($postTypes));
         
-        $mappingData = [
+        // Create ImportModelMap records for each post type
+        foreach ($postTypes as $postType => $typeData) {
+            $this->createMappingForPostType($import, $postType, $typeData, $modelMatches, $suggestions);
+        }
+        
+        // Also create mappings for meta fields if needed
+        if (isset($analysisData['meta_fields'])) {
+            $this->createMappingForMetaFields($import, $analysisData['meta_fields']);
+        }
+        
+        // Generate default mappings based on model matches
+        $mappings = $this->generateDefaultMappings($modelMatches);
+        
+        // Store analysis data for reference
+        $this->setStateData('model_mapping', [
             'post_types' => $postTypes,
             'model_matches' => $modelMatches,
             'suggestions' => $suggestions,
-            'mappings' => $this->generateDefaultMappings($modelMatches),
-            'unmapped_types' => $this->findUnmappedTypes($modelMatches),
-        ];
-        
-        $this->setStateData('model_mapping', $mappingData);
+            'mappings' => $mappings,
+            'mappings_created' => true,
+        ]);
     }
     
     protected function generateDefaultMappings(array $modelMatches): array
@@ -338,18 +361,20 @@ class MappingState extends AbstractState
             $mappingData['mappings'] = $updatedMappings;
             $this->setStateData('model_mapping', $mappingData);
         }
-        
+
+	    $mappingData['mappings'] = isset($mappingData['mappings']) ? $mappingData['mappings'] : [];
+
         // Determine next step
         $unmappedTypes = $this->getUnmappedPostTypes($mappingData['mappings']);
         
         if (!empty($unmappedTypes)) {
             $this->setStateData('unmapped_for_creation', $unmappedTypes);
+            $this->transitionTo(ModelCreationState::class);
+        } else {
+            $this->transitionTo(ModelCustomizationState::class);
         }
-        
-        // Use the state machine's preferred transition instead of hardcoding
-        $this->transitionToNextState($this->getImport());
     }
-    
+
     protected function getUnmappedPostTypes(array $mappings): array
     {
         $unmapped = [];
@@ -361,5 +386,222 @@ class MappingState extends AbstractState
         }
         
         return $unmapped;
+    }
+    
+    /**
+     * Create an ImportModelMap record for a specific post type
+     */
+    protected function createMappingForPostType(ImportContract $import, string $postType, array $typeData, array $modelMatches, array $suggestions): void
+    {
+        $matches = $modelMatches[$postType] ?? [];
+        $bestMatch = !empty($matches) ? $matches[0] : null;
+        
+        // Determine target model
+        $targetModel = null;
+        $confidence = 'low';
+        
+        if ($bestMatch && $bestMatch['confidence'] === 'high') {
+            $targetModel = $bestMatch['model']['class'];
+            $confidence = 'high';
+        } elseif (isset($suggestions[$postType])) {
+            $targetModel = $suggestions[$postType];
+            $confidence = 'medium';
+        }
+        
+        // Create the mapping record
+        $modelClass = ModelResolver::importModelMap();
+        $modelClass::create([
+            'import_id' => $import->id,
+            'source_table' => 'posts',
+            'source_type' => $postType,
+            'target_model' => $targetModel,
+            'target_table' => $targetModel ? $this->getTableFromModel($targetModel) : null,
+            'field_mappings' => $this->generateDefaultFieldMappings($postType),
+            'transformation_rules' => $this->generateDefaultTransformationRules($postType),
+            'driver' => get_class($import->getDriver()),
+            'is_active' => true,
+            'priority' => $this->getPostTypePriority($postType),
+            'metadata' => [
+                'post_type_data' => $typeData,
+                'confidence' => $confidence,
+                'auto_mapped' => $confidence === 'high',
+                'suggested_models' => $matches,
+            ]
+        ]);
+    }
+    
+    /**
+     * Create mappings for meta fields if needed
+     */
+    protected function createMappingForMetaFields(ImportContract $import, array $metaFields): void
+    {
+        // For now, create a general meta mapping
+        // In the future, this could be more sophisticated
+        $modelClass = ModelResolver::importModelMap();
+        $modelClass::create([
+            'import_id' => $import->id,
+            'source_table' => 'postmeta',
+            'source_type' => 'meta_field',
+            'target_model' => null, // Will be determined later
+            'target_table' => null,
+            'field_mappings' => $this->generateMetaFieldMappings($metaFields),
+            'transformation_rules' => $this->generateMetaTransformationRules($metaFields),
+            'driver' => get_class($import->getDriver()),
+            'is_active' => true,
+            'priority' => 200, // Lower priority than post types
+            'metadata' => [
+                'meta_field_count' => count($metaFields),
+                'is_meta_mapping' => true,
+            ]
+        ]);
+    }
+    
+    /**
+     * Get table name from model class
+     */
+    protected function getTableFromModel(string $modelClass): ?string
+    {
+        try {
+            if (class_exists($modelClass)) {
+                $instance = new $modelClass();
+                if (method_exists($instance, 'getTable')) {
+                    return $instance->getTable();
+                }
+            }
+        } catch (\Exception $e) {
+            // Ignore errors
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Generate default field mappings for a post type
+     */
+    protected function generateDefaultFieldMappings(string $postType): array
+    {
+        // Common WordPress to Laravel field mappings
+        $baseMappings = [
+            'ID' => 'id',
+            'post_title' => 'title',
+            'post_content' => 'content',
+            'post_excerpt' => 'excerpt',
+            'post_status' => 'status',
+            'post_date' => 'created_at',
+            'post_date_gmt' => 'created_at',
+            'post_modified' => 'updated_at',
+            'post_modified_gmt' => 'updated_at',
+            'post_author' => 'user_id',
+            'post_name' => 'slug',
+            'post_parent' => 'parent_id',
+            'menu_order' => 'sort_order',
+            'guid' => 'guid',
+        ];
+        
+        // Post type specific mappings
+        $specificMappings = match($postType) {
+            'page' => [
+                'post_title' => 'title',
+                'post_content' => 'content',
+                'post_status' => 'status',
+            ],
+            'attachment' => [
+                'post_title' => 'title',
+                'post_content' => 'description',
+                'post_excerpt' => 'caption',
+                'guid' => 'url',
+            ],
+            default => []
+        };
+        
+        return array_merge($baseMappings, $specificMappings);
+    }
+    
+    /**
+     * Generate default transformation rules
+     */
+    protected function generateDefaultTransformationRules(string $postType): array
+    {
+        return [
+            'post_date' => ['type' => 'datetime', 'format' => 'Y-m-d H:i:s'],
+            'post_date_gmt' => ['type' => 'datetime', 'format' => 'Y-m-d H:i:s'],
+            'post_modified' => ['type' => 'datetime', 'format' => 'Y-m-d H:i:s'],
+            'post_modified_gmt' => ['type' => 'datetime', 'format' => 'Y-m-d H:i:s'],
+            'post_author' => ['type' => 'foreign_key', 'references' => 'users.id'],
+            'post_parent' => ['type' => 'foreign_key', 'references' => 'posts.id'],
+            'post_status' => ['type' => 'enum', 'allowed' => ['publish', 'draft', 'private', 'pending']],
+        ];
+    }
+    
+    /**
+     * Generate meta field mappings
+     */
+    protected function generateMetaFieldMappings(array $metaFields): array
+    {
+        $mappings = [];
+        
+        foreach ($metaFields as $field) {
+            $fieldName = $field['field_name'];
+            $mappings[$fieldName] = $this->getMetaFieldMapping($fieldName);
+        }
+        
+        return $mappings;
+    }
+    
+    /**
+     * Get mapping for a specific meta field
+     */
+    protected function getMetaFieldMapping(string $fieldName): string
+    {
+        // Common WordPress meta field mappings
+        $commonMappings = [
+            '_thumbnail_id' => 'featured_image_id',
+            '_wp_page_template' => 'template',
+            '_edit_last' => 'last_editor_id',
+            '_edit_lock' => 'edit_lock',
+            '_wp_attached_file' => 'file_path',
+            '_wp_attachment_metadata' => 'attachment_metadata',
+        ];
+        
+        return $commonMappings[$fieldName] ?? Str::snake(str_replace('_', '', $fieldName));
+    }
+    
+    /**
+     * Generate meta transformation rules
+     */
+    protected function generateMetaTransformationRules(array $metaFields): array
+    {
+        $rules = [];
+        
+        foreach ($metaFields as $field) {
+            $fieldName = $field['field_name'];
+            $fieldType = $field['type'] ?? 'string';
+            
+            $rules[$fieldName] = match($fieldType) {
+                'integer' => ['type' => 'integer'],
+                'datetime' => ['type' => 'datetime'],
+                'boolean' => ['type' => 'boolean'],
+                'json' => ['type' => 'json'],
+                'url' => ['type' => 'url'],
+                'email' => ['type' => 'email'],
+                default => ['type' => 'string']
+            };
+        }
+        
+        return $rules;
+    }
+    
+    /**
+     * Get priority for post type (lower number = higher priority)
+     */
+    protected function getPostTypePriority(string $postType): int
+    {
+        return match($postType) {
+            'post' => 10,
+            'page' => 20,
+            'attachment' => 30,
+            'nav_menu_item' => 40,
+            default => 100
+        };
     }
 }

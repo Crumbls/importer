@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
 	public function getTableName() : string {
-		return with(new \Crumbls\Importer\Models\Import())->getTable();
+		$modelClass = ModelResolver::import();
+		return with(new $modelClass())->getTable();
 	}
 
     public function up(): void

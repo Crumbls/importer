@@ -22,31 +22,32 @@ use Illuminate\Support\Arr;
 
 class AnalyzingState extends BaseState
 {
-    public function label(): string
-    {
-        return 'Extract';
-    }
-    
-    public function description(): string
-    {
-        return 'Analyzing WordPress XML structure and content';
-    }
-    
     public function onEnter(): void
     {
+		dump(__LINE__);
+		return;
         // Call parent analysis logic
         parent::onEnter();
         
         // After analysis is complete, prepare data for transformation phase
         $this->prepareAnalysisForTransformation();
-        
+
+		$this->transitionToNextState($this->getRecord());
         // Transition to the Transform phase (MappingState)
-        $this->transitionToTransformPhase();
+//        $this->transitionToTransformPhase();
     }
-    
+
+	public function execute(): bool {
+		dump(__LINE__);
+		return true;
+	}
+	public function onExit() : void {
+		dump(__LINE__);
+	}
+
     protected function prepareAnalysisForTransformation(): void
     {
-        $import = $this->getImport();
+        $import = $this->getRecord();
         $metadata = $import->metadata ?? [];
 
 		unset($metadata['extraction_started']);
@@ -129,7 +130,7 @@ class AnalyzingState extends BaseState
     
     protected function getStorageDriver()
     {
-        $import = $this->getImport();
+        $import = $this->getRecord();
         $metadata = $import->metadata ?? [];
         
         if (!isset($metadata['storage_driver'])) {
@@ -138,12 +139,5 @@ class AnalyzingState extends BaseState
         
         return Storage::driver($metadata['storage_driver'])
             ->configureFromMetadata($metadata);
-    }
-    
-    protected function transitionToTransformPhase(): void
-    {
-        // Transition to the Transform phase - MappingState
-        // Pass the current context to ensure it's preserved
-        $this->transitionTo(MappingState::class, $this->getContext());
     }
 }

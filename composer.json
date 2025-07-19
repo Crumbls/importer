@@ -1,6 +1,6 @@
 {
     "name": "crumbls/importer",
-    "description": "A Laravel and Filament package for importing data",
+    "description": "A Laravel package that provides an advanced extract, transform, and load solution for your data. Much more than importer.",
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -19,7 +19,6 @@
         "php": "^8.2",
         "crumbls/state-machine": "*",
         "laravel/framework": "^12.0",
-        "filament/filament": "^4.x-dev",
         "spatie/laravel-package-tools": "^1.16"
     },
     "require-dev": {

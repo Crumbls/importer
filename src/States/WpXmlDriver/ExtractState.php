@@ -46,7 +46,7 @@ class ExtractState extends BaseState
     public function onEnter(): void
     {
         // Get import from context using the standard method
-        $import = $this->getImport();
+        $import = $this->getRecord();
         
         if (!$import) {
             Log::error('No import found in ExtractState context');
@@ -329,7 +329,7 @@ Preparing to process your WordPress XML file using optimized streaming technolog
         }
     }
 
-    protected    function transitionToNextState($record): void
+    protected function transitionToNextState($record): void
     {
         try {
             // Get the driver and its preferred transitions
