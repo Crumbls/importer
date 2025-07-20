@@ -48,7 +48,7 @@ class FileSourceResolver implements SourceResolverContract
             'size' => filesize($filePath),
             'type' => mime_content_type($filePath) ?: 'unknown',
             'readable' => is_readable($filePath),
-            'modified' => filemtime($filePath),
+            'modified_at' => filemtime($filePath),
         ];
     }
 }

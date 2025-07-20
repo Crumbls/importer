@@ -6,7 +6,9 @@ namespace Crumbls\Importer\Console;
 
 use Crumbls\Importer\Console\Prompts\CreateImportPrompt;
 use Crumbls\Importer\Console\Prompts\ListImportsPrompt;
+use Crumbls\Importer\Jobs\ExtractWordPressXmlJob;
 use Crumbls\Importer\States\AutoDriver\PendingState;
+use Crumbls\Importer\States\Shared\FailedState;
 use Crumbls\Importer\Traits\IsDiskAware;
 use Illuminate\Support\Str;
 use function Laravel\Prompts\text;
@@ -18,7 +20,6 @@ use Crumbls\Importer\Exceptions\InputNotProvided;
 use Crumbls\Importer\Exceptions\ImportException;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Models\Import;
-use Crumbls\Importer\Support\SourceResolverManager;
 use Crumbls\Importer\Resolvers\FileSourceResolver;
 use Crumbls\Importer\Facades\Storage;
 use Illuminate\Console\Command;
@@ -42,7 +43,9 @@ class ImporterCommand extends Command
 //            $import->delete();
 	    });
 
-		$record = Import::find(427);
+		$record = null;
+
+	    $record = Import::find(427);
 	    $record->driver = AutoDriver::class;
 		$record->state = PendingState::class;
 		$record->metadata = null;
@@ -50,9 +53,10 @@ class ImporterCommand extends Command
 		$record->save();
 	    $record->clearStateMachine();
 
-
-	    $prompt = new ListImportsPrompt($this);
-	    $record = $prompt->render();
+		if (!$record) {
+			$prompt = new ListImportsPrompt($this);
+			$record = $prompt->render();
+		}
 
 		if (!$record) {
 			$prompt = new CreateImportPrompt($this);
@@ -63,12 +67,10 @@ class ImporterCommand extends Command
 			}
 		}
 
-		$this->handleRecord($record);
-
-		return 0;
+		return $this->handleRecord($record);
     }
 
-	protected function handleRecord(ImportContract $record) : void {
+	protected function handleRecord(ImportContract $record) : int {
 
 		$this->clearScreen();
 
@@ -81,8 +83,6 @@ class ImporterCommand extends Command
 		$driverClass = get_class($driver);
 
 		if ($driverClass == AutoDriver::class) {
-			$this->info(__('importer::importer.import.using_driver', ['driver' => $driverClass]));
-
 			$this->processDriver($record);
 
 			$record->refresh();
@@ -97,15 +97,11 @@ class ImporterCommand extends Command
 			$record->clearStateMachine();
 		}
 
-		$this->clearScreen();
-
-
-		$this->info(__('importer::importer.import.using_driver', ['driver' => $driverClass]));
-
-		$this->processDriver($record);
+		$exitCode = $this->processDriver($record);
 
 //		$this->displayDatabaseStats($record);
 
+		return $exitCode;
 	}
 
 	/**
@@ -133,9 +129,10 @@ class ImporterCommand extends Command
 	}
 
 
-    protected function processDriver(ImportContract $record): void 
+    protected function processDriver(ImportContract $record): int 
     {
         $this->clearScreen();
+
         $record->clearStateMachine();
         
         $stateMachine = $record->getStateMachine();
@@ -144,7 +141,7 @@ class ImporterCommand extends Command
         
         if (empty($preferredTransitions)) {
             $this->error('No preferred transitions defined for this driver');
-            return;
+            return 1; // Error exit code
         }
 
         // Set initial state if needed
@@ -164,9 +161,19 @@ class ImporterCommand extends Command
 
         // Main state processing loop
         while ($currentStateClass && $iterations < $maxIterations) {
-            $this->clearScreen();
-            $this->info("Processing state: " . class_basename($currentStateClass));
-            
+			// Check if we've hit a failure state and should exit
+			if ($this->isFailureState($currentStateClass)) {
+				$this->error("❌ Import failed - stopping execution");
+				$this->info("State: " . class_basename($currentStateClass));
+				
+				// Show the failure prompt one time to display details
+				$promptClass = $currentStateClass::getCommandPrompt();
+				$prompt = new $promptClass($this, $record);
+				$prompt->render();
+				
+				return 1; // Exit with failure code
+			}
+
             // 1. Show state prompt
             $promptClass = $currentStateClass::getCommandPrompt();
             $prompt = new $promptClass($this, $record);
@@ -179,7 +186,7 @@ class ImporterCommand extends Command
             
             if (!$state->execute()) {
                 $this->error("State execution failed");
-                break;
+                return 1; // Exit with failure code
             }
             
             // 3. Check if state or driver changed during execution
@@ -187,16 +194,39 @@ class ImporterCommand extends Command
             
             // Check if driver changed during execution
             if ($record->driver !== $originalDriver) {
-                $this->info("✓ Driver changed to: " . class_basename($record->driver));
-                break; // Stop processing, let the command handle the new driver
+
+				$this->info("Driver changed to: " . $record->driver);
+                return 0; // Success - driver change is normal
             }
             
             // Check if state changed during execution
             $newStateClass = $record->state;
             if ($newStateClass !== $originalStateClass) {
                 $currentStateClass = $newStateClass;
+                
+                // Check if the new state is a failure state
+                if ($this->isFailureState($currentStateClass)) {
+                	$this->error("❌ Import transitioned to failed state during execution");
+                	$this->info("Failed State: " . class_basename($currentStateClass));
+                	
+                	// Show the failure prompt to display details
+                	$promptClass = $currentStateClass::getCommandPrompt();
+                	$prompt = new $promptClass($this, $record);
+                	$prompt->render();
+                	
+                	return 1; // Exit with failure code
+                }
             } else {
-                break;
+                // State didn't change - check if it's a waiting/polling state
+                $currentState = $stateMachine->getCurrentState();
+                if (method_exists($currentState, 'shouldContinuePolling') && $currentState->shouldContinuePolling()) {
+                    // State wants to continue polling, add a small delay and continue
+                    sleep(1);
+                    continue;
+                } else {
+                    // State execution complete, success
+                    return 0; // Success exit code
+                }
             }
             
             $iterations++;
@@ -204,8 +234,10 @@ class ImporterCommand extends Command
         
         if ($iterations >= $maxIterations) {
             $this->error("Maximum iterations reached - possible infinite loop detected");
+            return 1; // Failure exit code
         } else {
             $this->info("State machine processing complete.");
+            return 0; // Success exit code
         }
     }
 
@@ -537,4 +569,22 @@ class ImporterCommand extends Command
 		$this->getOutput()->write("\033[2J\033[H");
 	}
 
+	protected function isFailureState(string $stateClass) : bool {
+		// Check for exact FailedState class match
+		if ($stateClass === FailedState::class) {
+			return true;
+		}
+		
+		// Check for FailedState subclasses  
+		if (is_subclass_of($stateClass, FailedState::class)) {
+			return true;
+		}
+		
+		// Check for any class name containing "Failed" 
+		if (str_contains(class_basename($stateClass), 'Failed')) {
+			return true;
+		}
+		
+		return false;
+	}
 }

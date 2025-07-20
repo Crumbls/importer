@@ -108,7 +108,7 @@ abstract class AbstractState extends State implements ImportStateContract
     // =========================================================================
 
 	public function onEnter() : void {
-		dump(__FILE__);
+		dump(get_called_class() . '::' . __FUNCTION__);
 	}
 
     /**

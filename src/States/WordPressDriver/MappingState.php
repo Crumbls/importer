@@ -2,606 +2,553 @@
 
 namespace Crumbls\Importer\States\WordPressDriver;
 
-use Crumbls\Importer\States\AbstractState;
-use Crumbls\Importer\Services\ModelScanner;
-use Crumbls\Importer\Filament\Pages\GenericFormPage;
-use Crumbls\Importer\Resolvers\ModelResolver;
+use Crumbls\Importer\Exceptions\CompatibleDriverNotFoundException;
+use Crumbls\Importer\Facades\Importer;
 use Crumbls\Importer\Models\Contracts\ImportContract;
-use Crumbls\Importer\States\WordPressDriver\ModelCreationState;
-use Crumbls\Importer\States\WordPressDriver\ModelCustomizationState;
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Grid;
-use Illuminate\Support\Str;
+use Crumbls\Importer\States\AbstractState;
+use Crumbls\Importer\States\CompletedState;
+use Crumbls\Importer\States\FailedState;
+use Crumbls\Importer\States\Concerns\AnalyzesValues;
+use Crumbls\Importer\States\Concerns\StreamingAnalyzesValues;
+use Crumbls\Importer\States\Concerns\HasStorageDriver;
+use Crumbls\Importer\States\Concerns\HasSchemaAnalysis;
+use Crumbls\Importer\Support\MemoryManager;
+use Crumbls\Importer\Facades\Storage;
+use Crumbls\StateMachine\State;
+use Exception;
+use Crumbls\Importer\States\MappingState as BaseState;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
-class MappingState extends AbstractState
+class MappingState extends BaseState
 {
-    protected ModelScanner $scanner;
 
-	protected function getModelScanner() : ModelScanner {
-		if (!isset($this->scanner)) {
-			$this->scanner = new ModelScanner();
-		}
-		return $this->scanner;
+	public function getExcludedTables() : array {
+		return [
+			'posts',
+			'postmeta',
+			'comments',
+			'terms',
+			'term_relationships'
+		];
 	}
-    
-    public function label(): string
-    {
-        return 'Transform - Mapping';
-    }
-    
-    public function description(): string
-    {
-        return 'Map WordPress post types to Laravel models';
-    }
-    
-    public function canEnter(): bool
-    {
-        // Check if the import has required data for mapping
-        $import = $this->getRecord();
-        $metadata = $import->metadata ?? [];
-        
-        // Ensure we have analyzed data to work with
-        return isset($metadata['data_map']) && !empty($metadata['data_map']);
-    }
-    
-    public function onEnter(): void
-    {
-        $this->generateModelMappings();
-        
-        // Note: Auto-skip logic moved to CLI handling to avoid duplicate transitions
-        // The shouldAutoSkip() and handleAutoSkip() methods are still available for CLI usage
-    }
-    
-    protected function shouldAutoSkip(): bool
-    {
-        $mappingData = $this->getStateData('model_mapping');
-        
-        if (!$mappingData || !isset($mappingData['mappings'])) {
-            return false;
-        }
-        
-        // Check if all post types have high-confidence model matches
-        foreach ($mappingData['mappings'] as $postType => $mapping) {
-            if (!$mapping['model_class'] || !$mapping['auto_mapped'] || $mapping['confidence'] !== 'high') {
-                return false;
-            }
-        }
-        
-        // All post types have confident mappings
-        return true;
-    }
-    
-    protected function handleAutoSkip(): void
-    {
-        // Log the auto-skip for transparency
-        $mappingData = $this->getStateData('model_mapping');
-        $autoMappedCount = count($mappingData['mappings']);
-        
-        $this->setStateData('mapping_auto_skipped', [
-            'skipped' => true,
-            'reason' => 'All post types automatically mapped to existing models',
-            'mapped_count' => $autoMappedCount,
-            'timestamp' => now(),
-        ]);
-        
-        // Determine next state based on whether models need to be created
-        $unmappedTypes = $this->getUnmappedPostTypes($mappingData['mappings']);
 
-		dd($unmappedTypes);
-        if (!empty($unmappedTypes)) {
-            $this->setStateData('unmapped_for_creation', $unmappedTypes);
-            $this->transitionTo(ModelCreationState::class);
-        } else {
-            $this->transitionTo(ModelCustomizationState::class);
-        }
+    /**
+     * Prepare analysis data for the mapping state
+     */
+    protected function prepareAnalysisForMappingState(array $metadata): void
+    {
+        $dataMap = $metadata['data_map'] ?? [];
+        
+        // Transform the data structure for the mapping state
+        $analysisData = [
+            'post_types' => $this->extractPostTypes($dataMap),
+            'meta_fields' => $this->extractMetaFields($dataMap),
+            'post_columns' => $this->extractPostColumns($dataMap),
+            'field_analysis' => $dataMap, // Keep original for reference
+            'extraction_stats' => $metadata['parsing_stats'] ?? [],
+        ];
+        
+        // Store in state data for next states
+        $this->setStateData('analysis', $analysisData);
     }
     
-    protected function generateModelMappings(): void
+    /**
+     * Extract post types from data map
+     */
+    protected function extractPostTypes(array $dataMap): array
     {
-        $analysisData = $this->getStateData('analysis');
+        $postTypes = [];
         
-        if (!$analysisData || !isset($analysisData['post_types'])) {
-            $this->setStateData('mapping_error', 'No post type analysis data found');
-            return;
-        }
+        // Get the storage driver to analyze post types
+        $storage = $this->getStorageDriver();
         
-        $import = $this->getRecord();
-        $postTypes = $analysisData['post_types'];
-        $scanner = $this->getModelScanner();
-        
-        // Clear existing mappings for this import (force delete to avoid unique constraint issues)
-        $import->modelMaps()->forceDelete();
-        
-        // Generate model matches and suggestions
-        $modelMatches = $scanner->findModelMatches($postTypes);
-        $suggestions = $scanner->suggestModelNames(array_keys($postTypes));
-        
-        // Create ImportModelMap records for each post type
-        foreach ($postTypes as $postType => $typeData) {
-            $this->createMappingForPostType($import, $postType, $typeData, $modelMatches, $suggestions);
-        }
-        
-        // Also create mappings for meta fields if needed
-        if (isset($analysisData['meta_fields'])) {
-            $this->createMappingForMetaFields($import, $analysisData['meta_fields']);
-        }
-        
-        // Generate default mappings based on model matches
-        $mappings = $this->generateDefaultMappings($modelMatches);
-        
-        // Store analysis data for reference
-        $this->setStateData('model_mapping', [
-            'post_types' => $postTypes,
-            'model_matches' => $modelMatches,
-            'suggestions' => $suggestions,
-            'mappings' => $mappings,
-            'mappings_created' => true,
-        ]);
-    }
-    
-    protected function generateDefaultMappings(array $modelMatches): array
-    {
-        $mappings = [];
-        
-        foreach ($modelMatches as $postType => $matches) {
-            if (!empty($matches) && $matches[0]['confidence'] === 'high') {
-                // Auto-map high confidence matches
-                $mappings[$postType] = [
-                    'model_class' => $matches[0]['model']['class'],
-                    'auto_mapped' => true,
-                    'confidence' => $matches[0]['confidence'],
-                ];
-            } else {
-                // Leave for manual mapping
-                $mappings[$postType] = [
-                    'model_class' => null,
-                    'auto_mapped' => false,
-                    'confidence' => null,
+        if ($storage && method_exists($storage, 'db')) {
+            $connection = $storage->db();
+            
+            // Get post type counts
+            $postTypeCounts = $connection
+	            ->table('posts')
+                ->select('post_type')
+                ->selectRaw('COUNT(*) as count')
+                ->groupBy('post_type')
+                ->get()
+                ->pluck('count', 'post_type')
+                ->toArray();
+                
+            foreach ($postTypeCounts as $postType => $count) {
+                $postTypes[$postType] = [
+                    'count' => $count,
+                    'type' => $postType,
+                    'description' => ucfirst($postType) . ' content type',
                 ];
             }
         }
         
-        return $mappings;
+        return $postTypes;
     }
     
-    protected function findUnmappedTypes(array $modelMatches): array
+    /**
+     * Extract meta fields from data map
+     */
+    protected function extractMetaFields(array $dataMap): array
     {
-        $unmapped = [];
+        $metaFields = [];
         
-        foreach ($modelMatches as $postType => $matches) {
-            if (empty($matches) || $matches[0]['confidence'] !== 'high') {
-                $unmapped[] = $postType;
+        foreach ($dataMap as $field) {
+            if (($field['field_type'] ?? '') === 'meta_field') {
+                $metaFields[] = $field;
             }
         }
         
-        return $unmapped;
+        return $metaFields;
     }
     
-    public function getRecommendedPageClass(): string
+    /**
+     * Extract post columns from data map
+     */
+    protected function extractPostColumns(array $dataMap): array
     {
-        return GenericFormPage::class;
-    }
-    
-    public function form(Schema $schema): Schema
-    {
-        $mappingData = $this->getStateData('model_mapping');
+        $postColumns = [];
         
-        if (!$mappingData) {
-            return $schema->schema([
-                Placeholder::make('error')
-                    ->content('No mapping data available. Please go back to analysis.')
+        foreach ($dataMap as $field) {
+            if (($field['field_type'] ?? '') === 'post_column') {
+                $postColumns[] = $field;
+            }
+        }
+        
+        return $postColumns;
+    }
+    
+    /**
+     * Generate model maps using comprehensive schema analysis
+     */
+    public function exclude_getModelMaps(): array
+    {
+        $modelMaps = [];
+        
+        // Get all tables from storage
+        $tableNames = $this->getStorageTables();
+        
+        foreach ($tableNames as $tableName) {
+            // Skip excluded tables (they're handled elsewhere)
+            if (in_array($tableName, $this->getExcludedTables())) {
+                continue;
+            }
+            
+            // Analyze the table schema comprehensively
+            $schema = $this->analyzeTableSchema($tableName);
+            
+            $modelMaps[$tableName] = [
+                'table_name' => $tableName,
+                'suggested_model_name' => $this->generateModelName($tableName),
+                'schema' => $schema,
+                'record_count' => $this->countStorageRecords($tableName),
+                'migration_columns' => $this->generateMigrationColumns($schema),
+                'recommended_indexes' => $this->suggestIndexes($schema),
+            ];
+        }
+        
+        // Handle special WordPress tables with custom analysis
+        $modelMaps = array_merge($modelMaps, $this->getWordPressSpecialTables());
+        
+        return $modelMaps;
+    }
+    
+    /**
+     * Generate model name from table name
+     */
+    protected function generateModelName(string $tableName): string
+    {
+        return str($tableName)->studly()->singular()->toString();
+    }
+    
+    /**
+     * Generate migration column definitions from schema
+     */
+    protected function generateMigrationColumns(array $schema): array
+    {
+        $columns = [];
+        
+        foreach ($schema as $columnName => $analysis) {
+            $columns[$columnName] = $this->generateMigrationColumn($analysis);
+        }
+        
+        return $columns;
+    }
+    
+    /**
+     * Suggest database indexes based on data patterns
+     */
+    protected function suggestIndexes(array $schema): array
+    {
+        $indexes = [];
+        
+        foreach ($schema as $columnName => $analysis) {
+            // Suggest indexes for high-uniqueness columns
+            if (isset($analysis['unique_count']) && isset($analysis['total_records'])) {
+                $uniqueness = $analysis['unique_count'] / max(1, $analysis['total_records']);
+                
+                if ($uniqueness > 0.8) {
+                    $indexes[] = [
+                        'type' => 'index',
+                        'columns' => [$columnName],
+                        'reason' => 'High uniqueness ratio: ' . round($uniqueness * 100, 1) . '%'
+                    ];
+                } elseif ($uniqueness < 0.1 && $analysis['total_records'] > 1000) {
+                    $indexes[] = [
+                        'type' => 'index', 
+                        'columns' => [$columnName],
+                        'reason' => 'Low uniqueness, good for filtering large dataset'
+                    ];
+                }
+            }
+            
+            // Suggest primary key for ID-like columns
+            if (str_contains(strtolower($columnName), 'id') && 
+                ($analysis['type'] ?? '') === 'bigInteger' &&
+                isset($analysis['unique_count']) && isset($analysis['total_records']) &&
+                $analysis['unique_count'] === $analysis['total_records']) {
+                
+                $indexes[] = [
+                    'type' => 'primary',
+                    'columns' => [$columnName],
+                    'reason' => 'Unique ID column'
+                ];
+            }
+        }
+        
+        return $indexes;
+    }
+    
+    /**
+     * Handle special WordPress tables with custom analysis
+     */
+    protected function getWordPressSpecialTables(): array
+    {
+        $specialTables = [];
+        
+        // Analyze postmeta key-value data
+        if ($this->storageTableExists('postmeta')) {
+            $postmetaAnalysis = $this->analyzeKeyValueData('postmeta', 'meta_key', 'meta_value');
+            
+            $specialTables['postmeta_fields'] = [
+                'table_name' => 'postmeta',
+                'type' => 'key_value_analysis',
+                'suggested_model_name' => 'PostMeta',
+                'key_analysis' => $postmetaAnalysis,
+                'top_keys' => $this->getTopMetaKeys('postmeta', 'meta_key'),
+                'migration_suggestions' => $this->generateMetaFieldMigrations($postmetaAnalysis),
+            ];
+        }
+        
+        // Analyze posts table with post type breakdown
+        if ($this->storageTableExists('posts')) {
+            $postTypeAnalysis = $this->analyzePostTypeData();
+            
+            $specialTables['post_types'] = [
+                'table_name' => 'posts',
+                'type' => 'post_type_analysis', 
+                'post_types' => $postTypeAnalysis,
+                'suggested_models' => $this->generatePostTypeModels($postTypeAnalysis),
+            ];
+        }
+        
+        return $specialTables;
+    }
+    
+    /**
+     * Get the most common meta keys
+     */
+    protected function getTopMetaKeys(string $tableName, string $keyColumn, int $limit = 20): array
+    {
+        $data = $this->selectFromStorage($tableName);
+        $keyCounts = [];
+        
+        foreach ($data as $row) {
+            $key = $row[$keyColumn] ?? '';
+            $keyCounts[$key] = ($keyCounts[$key] ?? 0) + 1;
+        }
+        
+        arsort($keyCounts);
+        return array_slice($keyCounts, 0, $limit, true);
+    }
+    
+    /**
+     * Generate migration suggestions for meta fields
+     */
+    protected function generateMetaFieldMigrations(array $metaAnalysis): array
+    {
+        $migrations = [];
+        
+        foreach ($metaAnalysis as $metaKey => $analysis) {
+            if (($analysis['total_records'] ?? 0) > 100) { // Only suggest for common fields
+                $migrations[$metaKey] = [
+                    'column_name' => str($metaKey)->snake()->toString(),
+                    'column_type' => $analysis['type'] ?? 'string',
+                    'nullable' => $analysis['nullable'] ?? true,
+                    'migration_line' => $this->generateMigrationColumn($analysis),
+                    'usage_count' => $analysis['total_records'] ?? 0,
+                ];
+            }
+        }
+        
+        return $migrations;
+    }
+    
+    /**
+     * Analyze post data by post type
+     */
+    protected function analyzePostTypeData(): array
+    {
+        $data = $this->selectFromStorage('posts');
+        $postTypes = [];
+        
+        foreach ($data as $row) {
+            $postType = $row['post_type'] ?? 'unknown';
+            
+            if (!isset($postTypes[$postType])) {
+                $postTypes[$postType] = [
+                    'count' => 0,
+                    'sample_data' => [],
+                ];
+            }
+            
+            $postTypes[$postType]['count']++;
+            
+            // Keep sample data for analysis
+            if (count($postTypes[$postType]['sample_data']) < 10) {
+                $postTypes[$postType]['sample_data'][] = $row;
+            }
+        }
+        
+        return $postTypes;
+    }
+    
+    /**
+     * Generate suggested models for different post types
+     */
+    protected function generatePostTypeModels(array $postTypeAnalysis): array
+    {
+        $models = [];
+        
+        foreach ($postTypeAnalysis as $postType => $data) {
+            if ($data['count'] > 50) { // Only suggest models for substantial post types
+                $models[$postType] = [
+                    'model_name' => str($postType)->studly()->toString(),
+                    'table_name' => 'posts',
+                    'scope_conditions' => ['post_type' => $postType],
+                    'record_count' => $data['count'],
+                    'percentage' => round($data['count'] / array_sum(array_column($postTypeAnalysis, 'count')) * 100, 1),
+                ];
+            }
+        }
+        
+        return $models;
+    }
+
+    /**
+     * TODO: Make this work with any of the storage drivers.  This is a late game task.
+     * @param $storage
+     * @return array
+     * @throws \Exception
+     */
+    protected function analyzePostTypes($storage): array
+    {
+        if (!method_exists($storage, 'db')) {
+            throw new Exception('Storage driver is not yet valid.');
+        }
+
+        $connection = $storage->db();
+
+        // Get the actual column names from the table structure  
+        $defaultFields = array_keys((array)$connection
+            ->table('posts')
+            ->take(1)
+            ->inRandomOrder()
+            ->get()
+            ->first());
+
+        $results = [];
+
+        // Analyze default post table columns
+        foreach ($defaultFields as $fieldName) {
+            $analysis = $this->analyzePostTableColumn($connection, $fieldName, null);
+            $analysis['field_name'] = $fieldName;
+            $analysis['field_type'] = 'post_column';
+            $results[] = $analysis;
+        }
+
+        // Get all meta keys and analyze them
+        $metaKeys = $connection
+            ->table('postmeta')
+            ->select('meta_key')
+            ->distinct()
+            ->pluck('meta_key');
+
+        // Continue adding to existing results array
+        foreach ($metaKeys as $metaKey) {
+            $analysis = $this->analyzeMetaFieldEfficiently($connection, $metaKey);
+            $analysis['field_name'] = $metaKey;
+            $analysis['field_type'] = 'meta_field';
+            $results[] = $analysis;
+        }
+
+        return $results;
+    }
+    
+    /**
+     * Analyze a post table column efficiently using sampling
+     */
+    private function analyzePostTableColumn($connection, string $fieldName, ?string $postType): array
+    {
+        // Use chunked processing for large datasets
+        $chunkSize = 100;
+        $maxSamples = 1000; // Limit total samples for analysis
+        $samples = collect();
+        
+        $query = $connection->table('posts')
+            ->whereNotNull($fieldName)
+            ->where($fieldName, '!=', '')
+            ->select($fieldName)
+            ->orderBy($fieldName);
+            
+        // Add post type filter if specified
+        if ($postType !== null) {
+            $query->where('post_type', $postType);
+        }
+        
+        $query->chunk($chunkSize, function ($chunk) use (&$samples, $maxSamples, $fieldName) {
+            foreach ($chunk as $row) {
+                if ($samples->count() >= $maxSamples) {
+                    return false; // Stop chunking
+                }
+                $samples->push($row->$fieldName);
+            }
+        });
+        
+        return $this->analyzeValues($samples);
+    }
+    
+    /**
+     * 🚀 MEMORY OPTIMIZED: Analyze meta field using streaming analysis
+     */
+    private function analyzeMetaFieldEfficiently($connection, string $metaKey): array
+    {
+        // Get basic statistics first
+        $stats = $connection->table('postmeta')
+            ->where('meta_key', $metaKey)
+            ->selectRaw('COUNT(*) as total_count, COUNT(DISTINCT meta_value) as unique_count')
+            ->first();
+        
+        $totalCount = $stats->total_count;
+        $uniqueCount = $stats->unique_count;
+        
+        // Initialize memory manager for large datasets
+        $memoryManager = null;
+        if ($totalCount > 10000) {
+            $memoryLimit = $this->parseMemoryLimit('256M'); // Convert to bytes
+            $initialBatchSize = 1000;
+            
+            $memoryManager = new MemoryManager($memoryLimit, $initialBatchSize, [
+                'warning_threshold' => 0.8,   // 80% of memory limit
+                'critical_threshold' => 0.9,  // 90% of memory limit
+                'emergency_threshold' => 0.95, // 95% of memory limit
+                'min_batch_size' => 100,       // Don't go below 100
+                'max_batch_size' => 2000,      // Don't exceed 2000
             ]);
         }
         
-        return $schema->schema([
-            Section::make('Post Type to Model Mapping')
-                ->description('Map WordPress post types to your Laravel models. High confidence matches are pre-selected.')
-                ->schema([
-                    $this->buildMappingRepeater($mappingData),
-                ]),
-                
-            Section::make('Unmapped Post Types')
-                ->description('These post types need models created or manual mapping.')
-                ->schema([
-                    $this->buildUnmappedSection($mappingData),
-                ])
-                ->visible(fn() => !empty($mappingData['unmapped_types'])),
-        ]);
-    }
-    
-    protected function buildMappingRepeater(array $mappingData): Repeater
-    {
-		$scanner = $this->getModelScanner();
-        $availableModels = $scanner->discoverModels();
-        $modelOptions = collect($availableModels)->mapWithKeys(fn($model) => [
-            $model['class'] => $model['name'] . ' (' . $model['class'] . ')'
-        ]);
-        
-        return Repeater::make('model_mappings')
-            ->label('Model Mappings')
-            ->schema([
-                Grid::make(3)->schema([
-                    TextInput::make('post_type')
-                        ->label('Post Type')
-                        ->disabled()
-                        ->columnSpan(1),
-                        
-                    Select::make('model_class')
-                        ->label('Laravel Model')
-                        ->options($modelOptions)
-                        ->searchable()
-                        ->placeholder('Select a model...')
-                        ->columnSpan(1),
-                        
-                    Placeholder::make('stats')
-                        ->label('Count')
-                        ->content(fn($record) => $this->getPostTypeStats($record['post_type'], $mappingData))
-                        ->columnSpan(1),
-                ]),
-                
-                Placeholder::make('suggestions')
-                    ->label('Suggested Matches')
-                    ->content(fn($record) => $this->formatSuggestions($record['post_type'], $mappingData))
-                    ->visible(fn($record) => $this->hasSuggestions($record['post_type'], $mappingData)),
-            ])
-            ->default($this->getDefaultMappingData($mappingData))
-            ->addable(false)
-            ->deletable(false)
-            ->reorderable(false);
-    }
-    
-    protected function buildUnmappedSection(array $mappingData): Repeater
-    {
-        return Repeater::make('unmapped_types')
-            ->label('Post Types Needing Models')
-            ->schema([
-                Grid::make(3)->schema([
-                    TextInput::make('post_type')
-                        ->label('Post Type')
-                        ->disabled(),
-                        
-                    TextInput::make('suggested_model')
-                        ->label('Suggested Model Name')
-                        ->disabled(),
-                        
-                    Placeholder::make('action')
-                        ->label('Action Needed')
-                        ->content('Model will be created in next step'),
-                ]),
-            ])
-            ->default($this->getUnmappedData($mappingData))
-            ->addable(false)
-            ->deletable(false)
-            ->reorderable(false);
-    }
-    
-    protected function getDefaultMappingData(array $mappingData): array
-    {
-        $data = [];
-        
-        foreach ($mappingData['mappings'] as $postType => $mapping) {
-            $data[] = [
-                'post_type' => $postType,
-                'model_class' => $mapping['model_class'],
-            ];
-        }
-        
-        return $data;
-    }
-    
-    protected function getUnmappedData(array $mappingData): array
-    {
-        $data = [];
-        
-        foreach ($mappingData['unmapped_types'] as $postType) {
-            $suggestion = $mappingData['suggestions'][$postType] ?? null;
+        // For small datasets, use fast original method
+        if ($totalCount <= 1000) {
+            $values = $connection->table('postmeta')
+                ->where('meta_key', $metaKey)
+                ->pluck('meta_value');
             
-            $data[] = [
-                'post_type' => $postType,
-                'suggested_model' => $suggestion ? $suggestion['model_name'] : Str::studly($postType),
-            ];
+            return $this->analyzeValues($values);
         }
         
-        return $data;
-    }
-    
-    protected function getPostTypeStats(string $postType, array $mappingData): string
-    {
-        $stats = $mappingData['post_types'][$postType] ?? null;
-        return $stats ? number_format($stats['count']) . ' posts' : 'Unknown';
-    }
-    
-    protected function formatSuggestions(string $postType, array $mappingData): string
-    {
-        $matches = $mappingData['model_matches'][$postType] ?? [];
+        // For large datasets, use streaming analysis
+        $maxSamples = min(5000, max(1000, $totalCount * 0.05)); // 5% sample, min 1K, max 5K
         
-        if (empty($matches)) {
-            return 'No model matches found';
-        }
-        
-        $suggestions = [];
-        foreach (array_slice($matches, 0, 3) as $match) {
-            $model = $match['model'];
-            $suggestions[] = sprintf(
-                '%s (%s confidence)',
-                $model['name'],
-                $match['confidence']
-            );
-        }
-        
-        return implode(', ', $suggestions);
-    }
-    
-    protected function hasSuggestions(string $postType, array $mappingData): bool
-    {
-        $matches = $mappingData['model_matches'][$postType] ?? [];
-        return !empty($matches);
-    }
-    
-    public function handleFilamentFormSave(array $data): void
-    {
-        $mappingData = $this->getStateData('model_mapping');
-        
-        if (isset($data['model_mappings'])) {
-            // Update mappings with user selections
-            $updatedMappings = [];
-            foreach ($data['model_mappings'] as $mapping) {
-                $updatedMappings[$mapping['post_type']] = [
-                    'model_class' => $mapping['model_class'],
-                    'auto_mapped' => false,
-                    'user_selected' => true,
-                ];
-            }
+        // Create data provider that yields batches
+        $dataProvider = function() use ($connection, $metaKey, $memoryManager) {
+            $batchSize = $memoryManager ? $memoryManager->getCurrentBatchSize() : 1000;
+            $offset = 0;
             
-            $mappingData['mappings'] = $updatedMappings;
-            $this->setStateData('model_mapping', $mappingData);
-        }
-
-	    $mappingData['mappings'] = isset($mappingData['mappings']) ? $mappingData['mappings'] : [];
-
-        // Determine next step
-        $unmappedTypes = $this->getUnmappedPostTypes($mappingData['mappings']);
-        
-        if (!empty($unmappedTypes)) {
-            $this->setStateData('unmapped_for_creation', $unmappedTypes);
-            $this->transitionTo(ModelCreationState::class);
-        } else {
-            $this->transitionTo(ModelCustomizationState::class);
-        }
-    }
-
-    protected function getUnmappedPostTypes(array $mappings): array
-    {
-        $unmapped = [];
-        
-        foreach ($mappings as $postType => $mapping) {
-            if (empty($mapping['model_class'])) {
-                $unmapped[] = $postType;
-            }
-        }
-        
-        return $unmapped;
-    }
-    
-    /**
-     * Create an ImportModelMap record for a specific post type
-     */
-    protected function createMappingForPostType(ImportContract $import, string $postType, array $typeData, array $modelMatches, array $suggestions): void
-    {
-        $matches = $modelMatches[$postType] ?? [];
-        $bestMatch = !empty($matches) ? $matches[0] : null;
-        
-        // Determine target model
-        $targetModel = null;
-        $confidence = 'low';
-        
-        if ($bestMatch && $bestMatch['confidence'] === 'high') {
-            $targetModel = $bestMatch['model']['class'];
-            $confidence = 'high';
-        } elseif (isset($suggestions[$postType])) {
-            $targetModel = $suggestions[$postType];
-            $confidence = 'medium';
-        }
-        
-        // Create the mapping record
-        $modelClass = ModelResolver::importModelMap();
-        $modelClass::create([
-            'import_id' => $import->id,
-            'source_table' => 'posts',
-            'source_type' => $postType,
-            'target_model' => $targetModel,
-            'target_table' => $targetModel ? $this->getTableFromModel($targetModel) : null,
-            'field_mappings' => $this->generateDefaultFieldMappings($postType),
-            'transformation_rules' => $this->generateDefaultTransformationRules($postType),
-            'driver' => get_class($import->getDriver()),
-            'is_active' => true,
-            'priority' => $this->getPostTypePriority($postType),
-            'metadata' => [
-                'post_type_data' => $typeData,
-                'confidence' => $confidence,
-                'auto_mapped' => $confidence === 'high',
-                'suggested_models' => $matches,
-            ]
-        ]);
-    }
-    
-    /**
-     * Create mappings for meta fields if needed
-     */
-    protected function createMappingForMetaFields(ImportContract $import, array $metaFields): void
-    {
-        // For now, create a general meta mapping
-        // In the future, this could be more sophisticated
-        $modelClass = ModelResolver::importModelMap();
-        $modelClass::create([
-            'import_id' => $import->id,
-            'source_table' => 'postmeta',
-            'source_type' => 'meta_field',
-            'target_model' => null, // Will be determined later
-            'target_table' => null,
-            'field_mappings' => $this->generateMetaFieldMappings($metaFields),
-            'transformation_rules' => $this->generateMetaTransformationRules($metaFields),
-            'driver' => get_class($import->getDriver()),
-            'is_active' => true,
-            'priority' => 200, // Lower priority than post types
-            'metadata' => [
-                'meta_field_count' => count($metaFields),
-                'is_meta_mapping' => true,
-            ]
-        ]);
-    }
-    
-    /**
-     * Get table name from model class
-     */
-    protected function getTableFromModel(string $modelClass): ?string
-    {
-        try {
-            if (class_exists($modelClass)) {
-                $instance = new $modelClass();
-                if (method_exists($instance, 'getTable')) {
-                    return $instance->getTable();
+            while (true) {
+                $chunk = $connection->table('postmeta')
+                    ->where('meta_key', $metaKey)
+                    ->whereNotNull('meta_value')
+                    ->where('meta_value', '!=', '')
+                    ->orderBy('meta_id') // Use indexed column for consistent ordering
+                    ->skip($offset)
+                    ->take($batchSize)
+                    ->get();
+                
+                if ($chunk->isEmpty()) {
+                    break; // No more data
                 }
+                
+                // Monitor memory pressure during processing
+                if ($memoryManager) {
+                    $monitoring = $memoryManager->monitor();
+                    
+                    // Adjust batch size based on memory pressure
+                    if ($monitoring['pressure_level'] === 'critical' || $monitoring['pressure_level'] === 'emergency') {
+                        $batchSize = $memoryManager->getCurrentBatchSize();
+                        Log::info('Memory pressure detected, batch size adjusted', [
+                            'pressure_level' => $monitoring['pressure_level'],
+                            'new_batch_size' => $batchSize,
+                            'memory_usage' => $monitoring['usage_percentage'] . '%'
+                        ]);
+                    }
+                }
+                
+                // Yield the values from this chunk
+                yield $chunk->pluck('meta_value');
+                
+                $offset += $batchSize;
             }
-        } catch (\Exception $e) {
-            // Ignore errors
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Generate default field mappings for a post type
-     */
-    protected function generateDefaultFieldMappings(string $postType): array
-    {
-        // Common WordPress to Laravel field mappings
-        $baseMappings = [
-            'ID' => 'id',
-            'post_title' => 'title',
-            'post_content' => 'content',
-            'post_excerpt' => 'excerpt',
-            'post_status' => 'status',
-            'post_date' => 'created_at',
-            'post_date_gmt' => 'created_at',
-            'post_modified' => 'updated_at',
-            'post_modified_gmt' => 'updated_at',
-            'post_author' => 'user_id',
-            'post_name' => 'slug',
-            'post_parent' => 'parent_id',
-            'menu_order' => 'sort_order',
-            'guid' => 'guid',
-        ];
-        
-        // Post type specific mappings
-        $specificMappings = match($postType) {
-            'page' => [
-                'post_title' => 'title',
-                'post_content' => 'content',
-                'post_status' => 'status',
-            ],
-            'attachment' => [
-                'post_title' => 'title',
-                'post_content' => 'description',
-                'post_excerpt' => 'caption',
-                'guid' => 'url',
-            ],
-            default => []
         };
         
-        return array_merge($baseMappings, $specificMappings);
-    }
-    
-    /**
-     * Generate default transformation rules
-     */
-    protected function generateDefaultTransformationRules(string $postType): array
-    {
-        return [
-            'post_date' => ['type' => 'datetime', 'format' => 'Y-m-d H:i:s'],
-            'post_date_gmt' => ['type' => 'datetime', 'format' => 'Y-m-d H:i:s'],
-            'post_modified' => ['type' => 'datetime', 'format' => 'Y-m-d H:i:s'],
-            'post_modified_gmt' => ['type' => 'datetime', 'format' => 'Y-m-d H:i:s'],
-            'post_author' => ['type' => 'foreign_key', 'references' => 'users.id'],
-            'post_parent' => ['type' => 'foreign_key', 'references' => 'posts.id'],
-            'post_status' => ['type' => 'enum', 'allowed' => ['publish', 'draft', 'private', 'pending']],
-        ];
-    }
-    
-    /**
-     * Generate meta field mappings
-     */
-    protected function generateMetaFieldMappings(array $metaFields): array
-    {
-        $mappings = [];
+        // Use streaming analysis
+        $analysis = $this->analyzeValuesStreaming($dataProvider, $maxSamples, $memoryManager);
         
-        foreach ($metaFields as $field) {
-            $fieldName = $field['field_name'];
-            $mappings[$fieldName] = $this->getMetaFieldMapping($fieldName);
-        }
-        
-        return $mappings;
-    }
-    
-    /**
-     * Get mapping for a specific meta field
-     */
-    protected function getMetaFieldMapping(string $fieldName): string
-    {
-        // Common WordPress meta field mappings
-        $commonMappings = [
-            '_thumbnail_id' => 'featured_image_id',
-            '_wp_page_template' => 'template',
-            '_edit_last' => 'last_editor_id',
-            '_edit_lock' => 'edit_lock',
-            '_wp_attached_file' => 'file_path',
-            '_wp_attachment_metadata' => 'attachment_metadata',
+        // Add metadata about the analysis
+        $analysis['sampling_info'] = [
+            'total_records' => $totalCount,
+            'unique_records' => $uniqueCount,
+            'sample_size' => $analysis['breakdown']['total_count'] ?? 0,
+            'is_sampled' => $totalCount > 1000,
+            'uniqueness_ratio' => $totalCount > 0 ? round($uniqueCount / $totalCount * 100, 2) : 0,
+            'memory_optimized' => $totalCount > 10000,
+            'memory_stats' => $memoryManager ? $memoryManager->getMemoryEfficiencyReport() : null,
         ];
         
-        return $commonMappings[$fieldName] ?? Str::snake(str_replace('_', '', $fieldName));
-    }
-    
-    /**
-     * Generate meta transformation rules
-     */
-    protected function generateMetaTransformationRules(array $metaFields): array
-    {
-        $rules = [];
-        
-        foreach ($metaFields as $field) {
-            $fieldName = $field['field_name'];
-            $fieldType = $field['type'] ?? 'string';
-            
-            $rules[$fieldName] = match($fieldType) {
-                'integer' => ['type' => 'integer'],
-                'datetime' => ['type' => 'datetime'],
-                'boolean' => ['type' => 'boolean'],
-                'json' => ['type' => 'json'],
-                'url' => ['type' => 'url'],
-                'email' => ['type' => 'email'],
-                default => ['type' => 'string']
-            };
+        // Memory manager cleanup (note: no explicit cleanup method needed)
+        if ($memoryManager) {
+            Log::info('Memory manager processing complete', $memoryManager->getMemoryEfficiencyReport());
         }
         
-        return $rules;
+        return $analysis;
     }
     
     /**
-     * Get priority for post type (lower number = higher priority)
+     * Parse memory limit string to bytes
      */
-    protected function getPostTypePriority(string $postType): int
+    protected function parseMemoryLimit(string $limit): int
     {
-        return match($postType) {
-            'post' => 10,
-            'page' => 20,
-            'attachment' => 30,
-            'nav_menu_item' => 40,
-            default => 100
+        $value = (int) $limit;
+        $unit = strtoupper(substr($limit, -1));
+        
+        return match($unit) {
+            'G' => $value * 1024 * 1024 * 1024,
+            'M' => $value * 1024 * 1024,
+            'K' => $value * 1024,
+            default => $value
         };
     }
 }

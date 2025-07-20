@@ -1,0 +1,30 @@
+parameters:
+    level: 4
+    paths:
+        - src
+    excludePaths:
+        - tests
+    ignoreErrors:
+        # Allow mixed types for metadata arrays
+        - '#Cannot access offset .* on mixed#'
+        - '#Cannot call method .* on mixed#'
+        # Allow dynamic property access on models
+        - '#Access to an undefined property [a-zA-Z0-9\\_]+::\$[a-zA-Z0-9_]+#'
+        # Allow Laravel magic methods
+        - '#Call to an undefined method Illuminate\\[a-zA-Z0-9\\_]+::[a-zA-Z0-9_]+\(\)#'
+        # Allow state machine dynamic calls
+        - '#Call to an undefined method Crumbls\\[a-zA-Z0-9\\_]+::[a-zA-Z0-9_]+\(\)#'
+    reportUnmatchedIgnoredErrors: false
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+    treatPhpDocTypesAsCertain: false
+    # Laravel specific configurations
+    bootstrapFiles:
+        - vendor/autoload.php
+    scanDirectories:
+        - vendor/laravel/framework
+        - vendor/filament
+    universalObjectCratesClasses:
+        - Illuminate\Http\Request
+        - Illuminate\Database\Eloquent\Model
+        - Illuminate\Support\Collection

@@ -6,7 +6,6 @@ use Crumbls\Importer\Console\Prompts\AutoDriver\PendingStatePrompt;
 use Crumbls\Importer\Filament\Resources\ImportResource;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\States\PendingState as BaseState;
-use Crumbls\Importer\States\Concerns\AutoTransitionsTrait;
 use Crumbls\Importer\Support\StateMachineRunner;
 use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Components\View;
@@ -17,8 +16,7 @@ use Filament\Notifications\Notification;
 
 class PendingState extends BaseState
 {
-    use AutoTransitionsTrait;
-    
+
     // Auto-transition configuration
     protected int $autoTransitionPollingInterval = 1000; // 1 second
     protected int $autoTransitionDelay = 2; // 2 seconds

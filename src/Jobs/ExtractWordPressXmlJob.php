@@ -5,8 +5,8 @@ namespace Crumbls\Importer\Jobs;
 use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Parsers\WordPressXmlStreamParser;
+use Crumbls\Importer\StorageDrivers\Contracts\StorageDriverContract;
 use Crumbls\Importer\Support\SourceResolverManager;
-use Crumbls\Importer\Resolvers\FileSourceResolver;
 use Crumbls\Importer\States\Shared\FailedState;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,8 +14,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
-class ExtractWordPressXmlJob implements ShouldQueue
+class   ExtractWordPressXmlJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -24,8 +25,8 @@ class ExtractWordPressXmlJob implements ShouldQueue
     protected int $timeLimit;
 
     public $timeout = 7200; // 2 hours maximum
-    public $tries = 3;
-    public $maxExceptions = 3;
+    public $tries = 1; // Only retry 3 times instead of 1000
+    public $maxExceptions = 1;
 
     public function __construct(ImportContract $import)
     {
@@ -42,20 +43,19 @@ class ExtractWordPressXmlJob implements ShouldQueue
         $startTime = microtime(true);
         $startMemory = memory_get_usage(true);
         
-        Log::info('Starting WordPress XML extraction job', [
-            'import_id' => $this->import->getKey(),
-            'start_memory' => $this->formatBytes($startMemory),
-            'memory_limit' => $this->formatBytes($this->memoryLimit)
-        ]);
-
         try {
+            Log::info('Starting extraction job', [
+                'import_id' => $this->import->getKey(),
+                'source_type' => $this->import->source_type,
+                'memory_limit' => $this->formatBytes($this->memoryLimit)
+            ]);
+            
             $this->updateStatus('initializing', 'Setting up extraction process...');
             
             // Setup storage and verify database connection
             $metadata = $this->import->metadata ?? [];
             $storage = $this->setupStorage($metadata);
             $sourceResolver = $this->setupSourceResolver();
-            
             $this->updateStatus('processing', 'Starting XML stream processing...');
             
             // Create memory-efficient parser with progress callbacks
@@ -72,7 +72,6 @@ class ExtractWordPressXmlJob implements ShouldQueue
 
             // Execute the parsing with automatic memory management
             $stats = $parser->parse($this->import, $storage, $sourceResolver);
-            
             $endTime = microtime(true);
             $endMemory = memory_get_usage(true);
             $peakMemory = memory_get_peak_usage(true);
@@ -91,21 +90,13 @@ class ExtractWordPressXmlJob implements ShouldQueue
                 ]
             ]);
 
-            Log::info('WordPress XML extraction completed successfully', [
-                'import_id' => $this->import->getKey(),
-                'duration' => round($endTime - $startTime, 2) . 's',
-                'peak_memory' => $this->formatBytes($peakMemory),
-                'posts_processed' => $stats['posts'] ?? 0,
-                'total_items' => ($stats['posts'] ?? 0) + ($stats['comments'] ?? 0) + ($stats['terms'] ?? 0)
-            ]);
-
         } catch (\Exception $e) {
-            $this->handleJobFailure($e, $startTime);
+	        $this->handleJobFailure($e, $startTime);
             throw $e;
         }
     }
 
-    protected function setupStorage(array $metadata): \Crumbls\Importer\StorageDrivers\Contracts\StorageDriverContract
+    protected function setupStorage(array $metadata): StorageDriverContract
     {
         // Reconfigure database connection (lost between requests)
         if (isset($metadata['storage_connection'], $metadata['storage_path'])) {
@@ -128,27 +119,33 @@ class ExtractWordPressXmlJob implements ShouldQueue
 
     protected function setupSourceResolver(): SourceResolverManager
     {
-        $sourceResolver = new SourceResolverManager();
-        
-        if ($this->import->source_type == 'storage') {
-            $sourceResolver->addResolver(new FileSourceResolver());
-        } else {
-            throw new \Exception("Unsupported source type: {$this->import->source_type}");
-        }
-        
+		$sourceResolver = $this->import->getSourceResolver();
+
         return $sourceResolver;
     }
 
     protected function calculateOptimalBatchSize(): int
     {
         // Calculate batch size based on available memory
-        $availableMemory = $this->memoryLimit - memory_get_usage(true);
+        $currentMemory = memory_get_usage(true);
+        $availableMemory = $this->memoryLimit - $currentMemory;
         $memoryPerMB = 1024 * 1024;
+        
+        // Ensure we have positive available memory
+        if ($availableMemory <= 0) {
+            Log::warning('Memory limit already exceeded during batch size calculation', [
+                'current_memory' => $this->formatBytes($currentMemory),
+                'memory_limit' => $this->formatBytes($this->memoryLimit)
+            ]);
+            return 10; // Very small batches when memory is tight
+        }
         
         if ($availableMemory > 100 * $memoryPerMB) {
             return 200; // High memory: large batches
         } elseif ($availableMemory > 50 * $memoryPerMB) {
             return 100; // Medium memory: medium batches
+        } elseif ($availableMemory > 20 * $memoryPerMB) {
+            return 50;  // Medium-low memory: smaller batches
         } else {
             return 25;  // Low memory: small batches
         }
@@ -249,33 +246,44 @@ class ExtractWordPressXmlJob implements ShouldQueue
         ]);
     }
 
-    protected function handleJobFailure(\Exception $e, float $startTime): void
+    protected function handleJobFailure(Throwable $e, float $startTime): void
     {
         $duration = microtime(true) - $startTime;
         $memoryUsage = memory_get_usage(true);
         $peakMemory = memory_get_peak_usage(true);
 
-        Log::error('WordPress XML extraction job failed', [
-            'import_id' => $this->import->getKey(),
-            'error' => $e->getMessage(),
-            'duration' => round($duration, 2) . 's',
-            'memory_usage' => $this->formatBytes($memoryUsage),
-            'peak_memory' => $this->formatBytes($peakMemory),
-            'file' => $e->getFile(),
-            'line' => $e->getLine()
-        ]);
+		$data = [
+			'error_message' => $e->getMessage(),
+			'failed_at' => now(),
+			'metadata' => array_merge($this->import->metadata ?? [], [
+				'extraction_status' => 'failed',
+				'extraction_error' => $e->getMessage(),
+				'extraction_failed_at' => now()->toISOString(),
+				'failure_details' => [
+					'duration_seconds' => $duration,
+					'memory_usage' => $this->formatBytes($memoryUsage),
+					'peak_memory' => $this->formatBytes($peakMemory),
+					'exception_type' => get_class($e),
+					'exception_file' => $e->getFile(),
+					'exception_line' => $e->getLine()
+				]
+			])
+		];
 
         // Update import status to failed
-        $this->import->update([
-            'state' => FailedState::class,
-            'error_message' => $e->getMessage(),
-            'failed_at' => now(),
-            'metadata' => array_merge($this->import->metadata ?? [], [
-                'extraction_status' => 'failed',
-                'extraction_error' => $e->getMessage(),
-                'extraction_failed_at' => now()->toISOString()
-            ])
-        ]);
+        $this->import->update($data);
+
+		$this->import->getStateMachine()->transitionTo(FailedState::class);
+		
+		Log::error('Job failed with detailed information', [
+			'import_id' => $this->import->getKey(),
+			'exception' => $e->getMessage(),
+			'type' => get_class($e),
+			'file' => $e->getFile(),
+			'line' => $e->getLine(),
+			'duration' => $duration,
+			'memory_peak' => $this->formatBytes($peakMemory)
+		]);
     }
 
     protected function parseMemoryLimit(string $limit): int
@@ -304,14 +312,9 @@ class ExtractWordPressXmlJob implements ShouldQueue
         }
     }
 
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
-        Log::error('WordPress XML extraction job permanently failed', [
-            'import_id' => $this->import->getKey(),
-            'error' => $exception->getMessage(),
-            'attempts' => $this->attempts()
-        ]);
-
+dd(get_class_methods($this));
         $this->handleJobFailure($exception, 0);
     }
 }

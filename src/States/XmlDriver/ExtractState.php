@@ -13,35 +13,23 @@ use Crumbls\Importer\Exceptions\ImportException;
 use Exception;
 use Filament\Forms\Components\TextInput;
 use Illuminate\Database\Schema\Blueprint;
+use Crumbls\Importer\States\ExtractState as BaseState;
 
-class ExtractState extends AbstractState
+class ExtractState extends BaseState
 {
 
     public function onEnter(): void
     {
+//		dd(__LINE__);
         // Base implementation - override in specific drivers
         // This allows the WpXmlDriver to extend without throwing exceptions
     }
 
-    // Filament UI Implementation - base version
-    public function getFilamentTitle(ImportContract $record): string
-    {
-        return 'Processing XML Data';
-    }
+	public function execute() : bool {
+		dd(__LINE__);
+	}
 
-    public function getFilamentHeading(ImportContract $record): string
-    {
-        return 'Extracting XML Content';
-    }
-
-    public function getFilamentSubheading(ImportContract $record): ?string
-    {
-        return 'Processing your XML file and extracting content...';
-    }
-
-    public function hasFilamentForm(): bool
-    {
-        return false; // Base implementation has no form
-    }
+	public function onExit(): void {
+	}
 
 }

@@ -29,7 +29,7 @@ class SourceResolverManager
     public function getMetadata(string $sourceType, string $sourceDetail): array
     {
         foreach ($this->resolvers as $resolver) {
-            if ($resolver->canHandle($sourceType)) {
+            if ($resolver->canHandle($sourceType,$sourceDetail)) {
                 return $resolver->getMetadata();
             }
         }

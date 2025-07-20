@@ -1,0 +1,66 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        php-version: [8.2, 8.3]
+        laravel-version: ['^12.0']
+
+    name: PHP ${{ matrix.php-version }} - Laravel ${{ matrix.laravel-version }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
+        coverage: xdebug
+
+    - name: Cache Composer packages
+      id: composer-cache
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php-${{ matrix.php-version }}-
+
+    - name: Install dependencies
+      run: |
+        composer update --prefer-dist --no-interaction --no-progress
+        composer install --prefer-dist --no-interaction --no-progress
+
+    - name: Run PHPStan
+      run: composer analyse
+
+    - name: Run Pest Tests
+      run: composer test
+
+    - name: Check for debug statements
+      run: |
+        if grep -r --include="*.php" -E "(var_dump|dd\(|dump\(|die\(|exit\()" src/ 2>/dev/null; then
+          echo "Debug statements found in source code"
+          exit 1
+        else
+          echo "No debug statements found"
+        fi
+
+    - name: Upload coverage reports to Codecov (PHP 8.2 only)
+      if: matrix.php-version == '8.2'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false

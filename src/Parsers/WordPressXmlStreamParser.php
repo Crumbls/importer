@@ -439,106 +439,112 @@ class WordPressXmlStreamParser
 
     protected function createTables(): void
     {
-        // Create posts table
-        if (!$this->storage->tableExists('posts')) {
-            $schema = (new SchemaDefinition('posts'))
-                ->bigInteger('post_id', ['primary' => true])
-                ->text('post_title', ['nullable' => true])
-                ->longText('post_content', ['nullable' => true])
-                ->text('post_excerpt', ['nullable' => true])
-                ->string('post_status', 20, ['default' => 'publish'])
-                ->string('post_type', 50, ['default' => 'post'])
-                ->timestamp('post_date', ['nullable' => true])
-                ->timestamp('post_date_gmt', ['nullable' => true])
-                ->string('post_name', 255, ['nullable' => true])
-                ->bigInteger('post_parent', ['default' => 0])
-                ->integer('menu_order', ['default' => 0])
-                ->text('guid', ['nullable' => true])
-                ->boolean('processed', ['default' => false])
-                ->timestamps()
-                ->index(['post_type', 'post_status'])
-                ->index('post_parent')
-                ->index('processed');
-                
-            $this->storage->createTableFromSchema('posts', $schema->toArray());
+        // Drop and recreate posts table to ensure clean schema
+        if ($this->storage->tableExists('posts')) {
+            $this->storage->dropTable('posts');
         }
+        $schema = (new SchemaDefinition('posts'))
+            ->bigInteger('post_id', ['primary' => true])
+            ->text('post_title', ['nullable' => true])
+            ->longText('post_content', ['nullable' => true])
+            ->text('post_excerpt', ['nullable' => true])
+            ->string('post_status', 20, ['default' => 'publish'])
+            ->string('post_type', 50, ['default' => 'post'])
+            ->timestamp('post_date', ['nullable' => true])
+            ->timestamp('post_date_gmt', ['nullable' => true])
+            ->string('post_name', 255, ['nullable' => true])
+            ->bigInteger('post_parent', ['default' => 0])
+            ->integer('menu_order', ['default' => 0])
+            ->text('guid', ['nullable' => true])
+            ->boolean('processed', ['default' => false])
+            ->timestamps()
+            ->index(['post_type', 'post_status'])
+            ->index('post_parent')
+            ->index('processed');
+            
+        $this->storage->createTableFromSchema('posts', $schema->toArray());
 
-        // Create postmeta table
-        if (!$this->storage->tableExists('postmeta')) {
-            $schema = (new SchemaDefinition('postmeta'))
-                ->integer('id', ['primary' => true])
-                ->bigInteger('post_id')
-                ->string('meta_key', 255, ['nullable' => true])
-                ->longText('meta_value', ['nullable' => true])
-                ->timestamps()
-                ->index(['post_id', 'meta_key']);
-                
-            $this->storage->createTableFromSchema('postmeta', $schema->toArray());
+        // Drop and recreate postmeta table to ensure clean schema
+        if ($this->storage->tableExists('postmeta')) {
+            $this->storage->dropTable('postmeta');
         }
+        $schema = (new SchemaDefinition('postmeta'))
+            ->integer('id', ['primary' => true])
+            ->bigInteger('post_id')
+            ->string('meta_key', 255, ['nullable' => true])
+            ->longText('meta_value', ['nullable' => true])
+            ->timestamps()
+            ->index(['post_id', 'meta_key']);
+            
+        $this->storage->createTableFromSchema('postmeta', $schema->toArray());
 
-        // Create comments table
-        if (!$this->storage->tableExists('comments')) {
-            $schema = (new SchemaDefinition('comments'))
-                ->bigInteger('comment_id', ['primary' => true])
-                ->bigInteger('post_id')
-                ->text('comment_author', ['nullable' => true])
-                ->string('comment_author_email', 100, ['nullable' => true])
-                ->text('comment_author_url', ['nullable' => true])
-                ->string('comment_author_IP', 100, ['nullable' => true])
-                ->timestamp('comment_date', ['nullable' => true])
-                ->timestamp('comment_date_gmt', ['nullable' => true])
-                ->longText('comment_content', ['nullable' => true])
-                ->string('comment_approved', 20, ['default' => '1'])
-                ->bigInteger('comment_parent', ['default' => 0])
-                ->timestamps()
-                ->index('post_id')
-                ->index('comment_approved');
-                
-            $this->storage->createTableFromSchema('comments', $schema->toArray());
+        // Drop and recreate comments table to ensure clean schema
+        if ($this->storage->tableExists('comments')) {
+            $this->storage->dropTable('comments');
         }
+        $schema = (new SchemaDefinition('comments'))
+            ->bigInteger('comment_id', ['primary' => true])
+            ->bigInteger('post_id')
+            ->text('comment_author', ['nullable' => true])
+            ->string('comment_author_email', 100, ['nullable' => true])
+            ->text('comment_author_url', ['nullable' => true])
+            ->string('comment_author_IP', 100, ['nullable' => true])
+            ->timestamp('comment_date', ['nullable' => true])
+            ->timestamp('comment_date_gmt', ['nullable' => true])
+            ->longText('comment_content', ['nullable' => true])
+            ->string('comment_approved', 20, ['default' => '1'])
+            ->bigInteger('comment_parent', ['default' => 0])
+            ->timestamps()
+            ->index('post_id')
+            ->index('comment_approved');
+            
+        $this->storage->createTableFromSchema('comments', $schema->toArray());
 
-        // Create terms table
-        if (!$this->storage->tableExists('terms')) {
-            $schema = (new SchemaDefinition('terms'))
-                ->bigInteger('term_id', ['primary' => true])
-                ->string('name')
-                ->string('slug')
-                ->string('taxonomy')
-                ->longText('description', ['nullable' => true])
-                ->bigInteger('parent', ['default' => 0])
-                ->bigInteger('count', ['default' => 0])
-                ->timestamps()
-                ->index('taxonomy');
-                
-            $this->storage->createTableFromSchema('terms', $schema->toArray());
+        // Drop and recreate terms table to ensure clean schema
+        if ($this->storage->tableExists('terms')) {
+            $this->storage->dropTable('terms');
         }
+        $schema = (new SchemaDefinition('terms'))
+            ->bigInteger('term_id', ['primary' => true])
+            ->string('name')
+            ->string('slug')
+            ->string('taxonomy')
+            ->longText('description', ['nullable' => true])
+            ->bigInteger('parent', ['default' => 0])
+            ->bigInteger('count', ['default' => 0])
+            ->timestamps()
+            ->index('taxonomy');
+            
+        $this->storage->createTableFromSchema('terms', $schema->toArray());
 
-        // Create term_relationships table
-        if (!$this->storage->tableExists('term_relationships')) {
-            $schema = (new SchemaDefinition('term_relationships'))
-                ->bigInteger('post_id')
-                ->bigInteger('term_id')
-                ->timestamps()
-                ->primary(['post_id', 'term_id']);
-                
-            $this->storage->createTableFromSchema('term_relationships', $schema->toArray());
+        // Drop and recreate term_relationships table to ensure clean schema
+        if ($this->storage->tableExists('term_relationships')) {
+            $this->storage->dropTable('term_relationships');
         }
+        $schema = (new SchemaDefinition('term_relationships'))
+            ->bigInteger('post_id')
+            ->bigInteger('term_id')
+            ->timestamps()
+            ->primary(['post_id', 'term_id']);
+            
+        $this->storage->createTableFromSchema('term_relationships', $schema->toArray());
 
-        // Create users table
-        if (!$this->storage->tableExists('users')) {
-            $schema = (new SchemaDefinition('users'))
-                ->bigInteger('user_id', ['primary' => true])
-                ->string('login', 255, ['nullable' => true])
-                ->string('email', 255, ['nullable' => true])
-                ->string('display_name', 255, ['nullable' => true])
-                ->string('first_name', 255, ['nullable' => true])
-                ->string('last_name', 255, ['nullable' => true])
-                ->timestamps()
-                ->index('login')
-                ->index('email');
-                
-            $this->storage->createTableFromSchema('users', $schema->toArray());
+        // Drop and recreate users table to ensure clean schema
+        if ($this->storage->tableExists('users')) {
+            $this->storage->dropTable('users');
         }
+        $schema = (new SchemaDefinition('users'))
+            ->bigInteger('user_id', ['primary' => true])
+            ->string('login', 255, ['nullable' => true])
+            ->string('email', 255, ['nullable' => true])
+            ->string('display_name', 255, ['nullable' => true])
+            ->string('first_name', 255, ['nullable' => true])
+            ->string('last_name', 255, ['nullable' => true])
+            ->timestamps()
+            ->index('login')
+            ->index('email');
+            
+        $this->storage->createTableFromSchema('users', $schema->toArray());
     }
 
     protected function addToBatch(string $table, array $data): void

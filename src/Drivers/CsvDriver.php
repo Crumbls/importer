@@ -2,46 +2,52 @@
 
 namespace Crumbls\Importer\Drivers;
 
-use Crumbls\Importer\Drivers\Contracts\DriverContract;
 use Crumbls\Importer\Models\Contracts\ImportContract;
-use Crumbls\Importer\Models\Import;
 use Crumbls\Importer\States\AutoDriver\AnalyzingState;
-use Crumbls\Importer\States\CancelledState;
 use Crumbls\Importer\States\CompletedState;
-use Crumbls\Importer\States\FailedState;
-use Crumbls\Importer\States\InitializingState;
 use Crumbls\Importer\States\CsvDriver\PendingState;
-use Crumbls\StateMachine\Examples\PendingPayment;
-use Crumbls\StateMachine\State;
+use Crumbls\Importer\States\FailedState;
 use Crumbls\StateMachine\StateConfig;
-use Illuminate\Support\Arr;
+use Exception;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Contracts\Filesystem\Filesystem;
-use Illuminate\Database\DatabaseManager;
-use Illuminate\Http\Client\PendingRequest;
 
 class CsvDriver extends AbstractDriver
 {
 
-	/**
-	 * TODO: Improve this.
-	 * @param ImportContract $import
-	 * @return bool
-	 */
-	public static function canHandle(ImportContract $import) : bool {
-		if (!preg_match('#^file::#', $import->source_type)) {
+	public static function canHandle(ImportContract $record): bool
+	{
+		if ($record->source_type !== 'storage') {
 			return false;
 		}
-		return preg_match('#\.csv#', $import->source_detail);
+
+		if (!preg_match('#^\w+::.*\.csv$#i', $record->source_detail)) {
+			return false;
+		}
+
+		[$disk, $path] = explode('::', $record->source_detail, 2);
+
+		try {
+			if (!Storage::disk($disk)->exists($path)) {
+				return false;
+			}
+
+			$stream = Storage::disk($disk)->readStream($path);
+			if (!$stream) {
+				return false;
+			}
+
+			fclose($stream);
+			return true;
+
+		} catch (Exception $e) {
+			return false;
+		}
 	}
 
-	public static function getPriority() : int
+	public static function getPriority(): int
 	{
 		return 100;
 	}
-
 
 	public static function config(): StateConfig
 	{
@@ -49,7 +55,6 @@ class CsvDriver extends AbstractDriver
 			->default(PendingState::class)
 			->allowTransition(PendingState::class, AnalyzingState::class)
 			->allowTransition(AnalyzingState::class, FailedState::class)
-			->allowTransition(AnalyzingState::class, CompletedState::class)
-;
+			->allowTransition(AnalyzingState::class, CompletedState::class);
 	}
 }

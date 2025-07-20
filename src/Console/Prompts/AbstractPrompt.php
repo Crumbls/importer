@@ -16,11 +16,12 @@ abstract class AbstractPrompt
 	 */
 	protected function clearScreen(): void
 	{
-		$this->command->getOutput()->write("\033[2J\033[H");
+
+//		$this->command->getOutput()->write("\033[2J\033[H");
 	}
 
 	public function info(string $message) : void {
-		$this->command->getOutput()->info($message);
+		$this->command->info($message);
 	}
 
 	protected function transitionToNextState() : void {

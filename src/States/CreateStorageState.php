@@ -5,7 +5,7 @@ namespace Crumbls\Importer\States;
 use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\Filament\Pages\GenericFormPage;
 use Crumbls\Importer\Models\Contracts\ImportContract;
-use Crumbls\Importer\States\Concerns\AutoTransitionsTrait;
+use Crumbls\Importer\States\Concerns\HasStorageDriver;
 use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -18,89 +18,59 @@ use Illuminate\Support\Facades\DB;
 
 class CreateStorageState extends AbstractState
 {
-	use AutoTransitionsTrait;
+	use HasStorageDriver;
 
-    private function createStorage(ImportContract$import): void
+    private function createStorage(ImportContract $import): void
     {
-            $metadata = $import->metadata ?? [];
-            $updated = false;
-
-            if (!isset($metadata['storage_driver']) || !$metadata['storage_driver']) {
-                $metadata['storage_driver'] = Storage::getDefaultDriver();
-            }
-
-            if (!isset($metadata['storage_connection']) || !$metadata['storage_connection']) {
-                $metadata['storage_connection'] = 'import_' . uniqid();
-                $updated = true;
-            }
-
-            $storeName = $this->getStoreName($import);
-
-            if (!isset($metadata['storage_path']) || !$metadata['storage_path']) {
-                // No storage path set, create new storage
-                $storage = Storage::driver($metadata['storage_driver'])
-                    ->createOrFindStore($storeName);
-
-                $metadata['storage_path'] = $storage->getStorePath();
-                $metadata['storage_created_at'] = now()->toISOString();
-                $updated = true;
-            } else {
-                // Storage path exists in metadata, check if the actual file/directory exists
-                $existingPath = $metadata['storage_path'];
-                
-                if (!file_exists($existingPath)) {
-                    // Path doesn't exist, create new storage
-                    $storage = Storage::driver($metadata['storage_driver'])
-                        ->createOrFindStore($storeName);
-
-                    $metadata['storage_path'] = $storage->getStorePath();
-                    $metadata['storage_created_at'] = now()->toISOString();
-                    $updated = true;
-                } else {
-                    // Path exists, verify it's accessible and writable
-                    if (!is_writable($existingPath) || !is_readable($existingPath)) {
-                        // Path exists but not accessible, create new storage
-                        $storage = Storage::driver($metadata['storage_driver'])
-                            ->createOrFindStore($storeName);
-
-                        $metadata['storage_path'] = $storage->getStorePath();
-                        $metadata['storage_created_at'] = now()->toISOString();
-                        $updated = true;
-                    }
-                    // Path exists and is accessible, use existing storage
-                }
-            }
-
-            $sqliteDbPath = $metadata['storage_path'];
-            $connectionName = $metadata['storage_connection'];
-
-            // Ensure SQLite file exists
-            if (!file_exists($sqliteDbPath)) {
-                touch($sqliteDbPath);
-            }
-
-            // Add SQLite connection to Laravel's database config
-            config([
-                "database.connections.{$connectionName}" => [
-                    'driver' => 'sqlite',
-                    'database' => $sqliteDbPath,
-                    'prefix' => '',
-                    'foreign_key_constraints' => true,
-                ]
+        // Set default storage driver if not already set
+        if (!$this->hasStorageDriver()) {
+            $this->setStorageDriver(Storage::getDefaultDriver(), [
+                'storage_connection' => 'import_' . uniqid(),
+                'storage_created_at' => now()->toISOString(),
             ]);
+        }
 
-            if ($updated) {
-                $import->update([
-                    'metadata' => $metadata
-                ]);
-            }
+        $storeName = $this->getStoreName($import);
+        
+        // Create or find the storage store using the concern
+        $storage = $this->createOrFindStorageStore($storeName);
+        
+        // Update metadata with storage path if needed
+        $metadata = $import->metadata ?? [];
+        if (!isset($metadata['storage_path']) || $metadata['storage_path'] !== $storage->getStorePath()) {
+            $metadata['storage_path'] = $storage->getStorePath();
+            $metadata['storage_updated_at'] = now()->toISOString();
+            $import->update(['metadata' => $metadata]);
+        }
 
-            // Test the connection
-            DB::connection($connectionName)->statement('CREATE TABLE IF NOT EXISTS connection_test (id INTEGER)');
-            DB::connection($connectionName)->statement('DROP TABLE connection_test');
+        // Set up Laravel database connection for SQLite
+        $sqliteDbPath = $storage->getStorePath();
+        $connectionName = $metadata['storage_connection'] ?? 'import_' . uniqid();
 
+        // Ensure SQLite file exists
+        if (!file_exists($sqliteDbPath)) {
+            touch($sqliteDbPath);
+        }
+
+        // Add SQLite connection to Laravel's database config
+        config([
+            "database.connections.{$connectionName}" => [
+                'driver' => 'sqlite',
+                'database' => $sqliteDbPath,
+                'prefix' => '',
+                'foreign_key_constraints' => true,
+            ]
+        ]);
+
+        // Test the connection
+        DB::connection($connectionName)->statement('CREATE TABLE IF NOT EXISTS connection_test (id INTEGER)');
+        DB::connection($connectionName)->statement('DROP TABLE connection_test');
     }
-    
+
+	public function onEnter() : void {
+
+	}
+
     public function execute(): bool
     {
         $record = $this->getRecord();
@@ -111,6 +81,10 @@ class CreateStorageState extends AbstractState
 
 		return true;
     }
+
+	public function onExit() : void {
+
+	}
 
     private function getStoreName(ImportContract $import): string
     {

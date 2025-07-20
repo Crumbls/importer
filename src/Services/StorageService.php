@@ -10,6 +10,7 @@ use Crumbls\Importer\Drivers\CsvDriver;
 use Crumbls\Importer\Drivers\XmlDriver;
 use Crumbls\Importer\Drivers\WpXmlDriver;
 use Crumbls\Importer\Events\ImportServiceInitialized;
+use Crumbls\Importer\StorageDrivers\SqliteDriver;
 use Illuminate\Support\Manager;
 
 class StorageService extends Manager
@@ -47,7 +48,7 @@ class StorageService extends Manager
 
 	protected function createSqliteDriver()
 	{
-		return new \Crumbls\Importer\StorageDrivers\SqliteDriver();
+		return new SqliteDriver();
 	}
 
     public function getAvailableDrivers(): array

@@ -9,14 +9,13 @@ use Crumbls\StateMachine\StateMachine;
 
 abstract class AbstractDriver extends State implements DriverContract
 {
-
-	public static function fromModel(ImportContract $record) : static {
-		// Create a state machine and return this driver as the state
+	public static function fromModel(ImportContract $record): static
+	{
 		$stateMachine = new StateMachine(static::class, ['model' => $record]);
 		return new static($stateMachine, ['model' => $record]);
 	}
 
-	public static function getPriority() : int
+	public static function getPriority(): int
 	{
 		return 100;
 	}

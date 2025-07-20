@@ -24,7 +24,8 @@
     "require-dev": {
         "orchestra/testbench": "^10.0",
         "pestphp/pest": "^3.8.0",
-        "pestphp/pest-plugin-laravel": "^3.0"
+        "pestphp/pest-plugin-laravel": "^3.0",
+        "phpstan/phpstan": "^1.10"
     },
     "autoload": {
         "psr-4": {
@@ -53,6 +54,11 @@
     "prefer-stable": true,
     "scripts": {
         "test": "./vendor/bin/pest",
-        "test-filter": "./vendor/bin/pest --filter"
+        "test-filter": "./vendor/bin/pest --filter",
+        "analyse": "./vendor/bin/phpstan analyse",
+        "quality": [
+            "@analyse",
+            "@test"
+        ]
     }
 }

@@ -6,8 +6,9 @@ use Crumbls\Importer\Drivers\Contracts\DriverContract;
 use Crumbls\Importer\Drivers\AutoDriver;
 use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\Models\Contracts\ImportContract;
-use Crumbls\Importer\Models\Traits\BelongsToTenant;
-use Crumbls\Importer\Models\Traits\BelongsToUser;
+use Crumbls\Importer\Models\Concerns\BelongsToTenant;
+use Crumbls\Importer\Models\Concerns\BelongsToUser;
+use Crumbls\Importer\Models\Concerns\HasSourceResolver;
 use Crumbls\Importer\Resolvers\ModelResolver;
 use Crumbls\Importer\States\Contracts\ImportStateContract;
 use Crumbls\StateMachine\Exceptions\StateSerializationException;
@@ -25,6 +26,7 @@ class Import extends Model implements ImportContract
     use BelongsToTenant,
 	    BelongsToUser,
 	    HasFactory,
+	    HasSourceResolver,
 	    HasStateMachine;
 
 	protected ?DriverContract $_driver;
@@ -41,7 +43,11 @@ class Import extends Model implements ImportContract
         'error_message',
         'user_id',
         'batch_id',
-        'started_at',
+		'scope_conditions',     // JSON array of simple conditions
+		'scope_callback',       // Closure/callback for complex filtering
+		'data_limit',          // Limit number of records
+		'where_clause',        // Raw WHERE conditions
+		'started_at',
         'completed_at',
         'failed_at',
     ];
@@ -54,6 +60,7 @@ class Import extends Model implements ImportContract
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'failed_at' => 'datetime',
+	    'scope_conditions' => 'array',
     ];
 
 	public static function booted() {
@@ -266,4 +273,18 @@ class Import extends Model implements ImportContract
 	{
 		return $this->modelMaps()->forSourceTable($table);
 	}
+
+	// In ImportModelMap
+	public function addScope(string $field, $value, string $operator = '=')
+	{
+		$conditions = $this->scope_conditions ?? [];
+		$conditions[] = [$field, $operator, $value];
+		$this->update(['scope_conditions' => $conditions]);
+	}
+
+	public function addLimit(int $limit)
+	{
+		$this->update(['data_limit' => $limit]);
+	}
+
 }
