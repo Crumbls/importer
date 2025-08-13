@@ -1,10 +1,12 @@
 <?php
 
-namespace Crumbls\Importer\States;
+namespace Crumbls\Importer\States\Shared;
 
+use Crumbls\Importer\Console\Prompts\Shared\CreateStoragePrompt;
 use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\Filament\Pages\GenericFormPage;
 use Crumbls\Importer\Models\Contracts\ImportContract;
+use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\States\Concerns\HasStorageDriver;
 use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Components\View;
@@ -91,4 +93,7 @@ class CreateStorageState extends AbstractState
         return "import_{$import->getKey()}";
     }
 
+	public function getPromptClass() : string {
+		return CreateStoragePrompt::class;
+	}
 }

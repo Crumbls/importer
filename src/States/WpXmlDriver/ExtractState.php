@@ -198,11 +198,11 @@ class ExtractState extends BaseState
 			$fileSizeMB = $fileSize / 1024 / 1024;
 
 
-			// Just brainstorming.
+			// Force synchronous processing for console commands
 			$forceSync = app()->runningInConsole() &&
-						$fileSizeMB < 10
-						&& false;
+						$fileSizeMB < 10;
 
+			// Force sync for development/testing
 			$forceSync = true;
 
 			if ($forceSync) {
@@ -518,7 +518,8 @@ Preparing to process your WordPress XML file using optimized streaming technolog
             }
 
             // Create and configure the WordPress XML parser for command-line use
-            $parser = new \Crumbls\Importer\Parsers\WordPressXmlStreamParser([
+
+            $parser = new WordPressXmlStreamParser([
                 'batch_size' => 50, // Smaller batches for command-line
                 'extract_meta' => true,
                 'extract_comments' => true,

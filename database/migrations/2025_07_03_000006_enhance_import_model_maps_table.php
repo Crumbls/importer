@@ -3,14 +3,13 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Crumbls\Importer\Resolvers\ModelResolver;
 
 return new class extends Migration
 {
     public function getTableName(): string 
     {
-        $modelClass = ModelResolver::importModelMap();
-        return with(new $modelClass())->getTable();
+        // Use default table name during migrations to avoid dependency issues
+        return 'import_model_maps';
     }
 
     /**
@@ -34,8 +33,7 @@ return new class extends Migration
             $table->json('migration_metadata')->after('performance_config')->default('{}');
             
             // Add indexes for new fields
-            $table->index(['import_id', 'entity_type']);
-            $table->index(['driver', 'entity_type']);
+            $table->index(['import_id', 'entity_type']);\
         });
     }
 
@@ -47,8 +45,7 @@ return new class extends Migration
         Schema::table($this->getTableName(), function (Blueprint $table) {
             // Remove indexes first
             $table->dropIndex(['import_id', 'entity_type']);
-            $table->dropIndex(['driver', 'entity_type']);
-            
+
             // Remove added columns
             $table->dropColumn([
                 'entity_type',

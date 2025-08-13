@@ -11,7 +11,6 @@ class DatabaseSourceResolver implements SourceResolverContract
 
 	public function canHandle(string $sourceType, string $sourceDetail): bool
     {
-		return false;
         return str_starts_with($sourceType, 'database::');
     }
 

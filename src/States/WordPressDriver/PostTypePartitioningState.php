@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\States\WordPressDriver;
 
+use Crumbls\Importer\Console\Prompts\Shared\GenericAutoPrompt;
 use Crumbls\Importer\Exceptions\CompatibleDriverNotFoundException;
 use Crumbls\Importer\Facades\Importer;
 use Crumbls\Importer\Models\Contracts\ImportContract;
@@ -30,6 +31,14 @@ class PostTypePartitioningState extends AbstractState
 	
 	// Cache for consistent table names across method calls
 	protected array $tableNameCache = [];
+
+	/**
+	 * Get the prompt class for viewing this state
+	 */
+	public function getPromptClass(): string
+	{
+		return GenericAutoPrompt::class;
+	}
 
 	public function onEnter() : void {
 	}

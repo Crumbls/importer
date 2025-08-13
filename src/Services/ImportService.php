@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\Services;
 
+use Crumbls\Importer\Drivers\Contracts\DriverContract;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Models\Import;
 use Crumbls\Importer\Drivers\AutoDriver;
@@ -12,7 +13,7 @@ class ImportService extends Manager
 {
 	private bool $initialized = false;
 
-	public function driver($name = null)
+	public function driver($name = null) : string
 	{
 		$this->initialize();
 		return parent::driver($name);
@@ -25,7 +26,7 @@ class ImportService extends Manager
         return $record;
     }
 
-    public function getDefaultDriver()
+    public function getDefaultDriver() : string
     {
         return $this->config->get('importer.default_driver', AutoDriver::class);
     }
@@ -52,15 +53,12 @@ class ImportService extends Manager
 
         $drivers = array_keys($this->customCreators);
 
-
-
 	    usort($drivers, function($a, $b) {
 			$driverA = $this->driver($a);
             $driverB = $this->driver($b);
 		    return $driverA::getPriority() <=> $driverB::getPriority();
         });
 
-	    
         return $drivers;
     }
 }

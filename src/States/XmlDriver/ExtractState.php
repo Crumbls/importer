@@ -12,7 +12,6 @@ use Crumbls\Importer\States\Shared\FailedState;
 use Crumbls\Importer\Exceptions\ImportException;
 use Exception;
 use Filament\Forms\Components\TextInput;
-use Illuminate\Database\Schema\Blueprint;
 use Crumbls\Importer\States\ExtractState as BaseState;
 
 class ExtractState extends BaseState

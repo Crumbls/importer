@@ -7,6 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
 
+/**
+ * Model resolver with dynamic method support
+ * 
+ * @method static class-string<Model> import()
+ * @method static class-string<Model> importModelMap()
+ * @method static class-string<Model> user()
+ * @method static Model instance(string $key)
+ */
 class ModelResolver
 {
     /** @var array<string, class-string<Model>> */
@@ -48,6 +56,10 @@ class ModelResolver
             return $modelClass;
         });
     }
+
+	public static function all() : array {
+		return (array) Config::get('importer.models', []);
+	}
 
     /**
      * @return class-string<Model>

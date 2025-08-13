@@ -28,8 +28,6 @@ interface ImportStateContract
      */
     public function shouldAutoTransition(ImportContract $record): bool;
 
-    // =========================================================================
-    // REAL-TIME FUNCTIONALITY
-    // =========================================================================
+	public function getPromptClass() : string;
 
 }

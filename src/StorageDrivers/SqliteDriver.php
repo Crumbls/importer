@@ -304,6 +304,91 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 		return $query->count();
 	}
 
+	public function limit(string $tableName, int $limit, int $offset = 0, array $conditions = []): array {
+		$this->connect();
+		
+		$this->validateTableName($tableName);
+		$query = $this->db->table($tableName);
+		
+		foreach ($conditions as $column => $value) {
+			if (is_array($value)) {
+				$query->whereIn($column, $value);
+			} else {
+				$query->where($column, $value);
+			}
+		}
+		
+		return $query->offset($offset)->limit($limit)->get()->toArray();
+	}
+
+	public function countWhere(string $tableName, $conditions, $value = null): int {
+		$this->connect();
+		
+		$this->validateTableName($tableName);
+		
+		$query = $this->db->table($tableName);
+		
+		// Handle different parameter formats
+		if (is_string($conditions) && $value !== null) {
+			// Single condition: countWhere('table', 'column', 'value')
+			$this->validateColumnName($conditions);
+			$query->where($conditions, $value);
+		} elseif (is_array($conditions)) {
+			// Multiple conditions: countWhere('table', ['column' => 'value', 'column2' => 'value2'])
+			foreach ($conditions as $column => $val) {
+				$this->validateColumnName($column);
+				if (is_array($val)) {
+					$query->whereIn($column, $val);
+				} else {
+					$query->where($column, $val);
+				}
+			}
+		}
+		
+		return $query->count();
+	}
+
+	public function countDistinct(string $tableName, string $column): int {
+		$this->connect();
+		
+		$this->validateTableName($tableName);
+		$this->validateColumnName($column);
+		
+		return $this->db->table($tableName)->distinct()->count($column);
+	}
+
+	public function min(string $tableName, string $column) {
+		$this->connect();
+		
+		$this->validateTableName($tableName);
+		$this->validateColumnName($column);
+		
+		return $this->db->table($tableName)->min($column);
+	}
+
+	public function max(string $tableName, string $column) {
+		$this->connect();
+		
+		$this->validateTableName($tableName);
+		$this->validateColumnName($column);
+		
+		return $this->db->table($tableName)->max($column);
+	}
+
+	public function sampleNonNull(string $tableName, string $column, int $limit = 100): array {
+		$this->connect();
+		
+		$this->validateTableName($tableName);
+		$this->validateColumnName($column);
+		
+		return $this->db->table($tableName)
+			->whereNotNull($column)
+			->where($column, '!=', '')
+			->limit($limit)
+			->pluck($column)
+			->toArray();
+	}
+
 	public function exists(string $tableName, array $conditions): bool {
 		return $this->count($tableName, $conditions) > 0;
 	}

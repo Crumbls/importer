@@ -26,6 +26,14 @@ interface StorageDriverContract
     public function count(string $tableName, array $conditions = []): int;
     public function exists(string $tableName, array $conditions): bool;
     
+    // Analysis Operations
+    public function limit(string $tableName, int $limit, int $offset = 0, array $conditions = []): array;
+    public function countWhere(string $tableName, $conditions, $value = null): int;
+    public function countDistinct(string $tableName, string $column): int;
+    public function min(string $tableName, string $column);
+    public function max(string $tableName, string $column);
+    public function sampleNonNull(string $tableName, string $column, int $limit = 100): array;
+    
     // Metadata
     public function getColumns(string $tableName): array;
     public function getSize(): int;

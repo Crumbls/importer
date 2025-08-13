@@ -10,6 +10,7 @@ use Crumbls\Importer\Drivers\CsvDriver;
 use Crumbls\Importer\Drivers\XmlDriver;
 use Crumbls\Importer\Drivers\WpXmlDriver;
 use Crumbls\Importer\Events\ImportServiceInitialized;
+use Crumbls\Importer\StorageDrivers\Contracts\StorageDriverContract;
 use Crumbls\Importer\StorageDrivers\SqliteDriver;
 use Illuminate\Support\Manager;
 
@@ -17,14 +18,14 @@ class StorageService extends Manager
 {
 	private bool $initialized = false;
 
-	public function driver($name = null)
+	public function driver($name = null) : StorageDriverContract
 	{
 		$this->initialize();
 		return parent::driver($name);
 	}
 
 
-    public function getDefaultDriver()
+    public function getDefaultDriver() : string
     {
 		$this->initialize();
         return $this->config->get('importer.default_storage', 'sqlite');

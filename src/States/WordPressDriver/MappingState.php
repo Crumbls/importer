@@ -16,7 +16,7 @@ use Crumbls\Importer\Support\MemoryManager;
 use Crumbls\Importer\Facades\Storage;
 use Crumbls\StateMachine\State;
 use Exception;
-use Crumbls\Importer\States\MappingState as BaseState;
+use Crumbls\Importer\States\Shared\MappingState as BaseState;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -65,7 +65,7 @@ class MappingState extends BaseState
         // Get the storage driver to analyze post types
         $storage = $this->getStorageDriver();
         
-        if ($storage && method_exists($storage, 'db')) {
+        if (isset($storage) && method_exists($storage, 'db')) {
             $connection = $storage->db();
             
             // Get post type counts

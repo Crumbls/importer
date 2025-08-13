@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\States;
 
+use Crumbls\Importer\Console\Prompts\Shared\GenericAutoPrompt;
 use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\Models\Contracts\ImportContract;
@@ -21,6 +22,14 @@ class ExtractState extends AbstractState
 
 	use DetectsQueueWorkers;
 
+	/**
+	 * Get the prompt class for viewing this state
+	 */
+	public function getPromptClass(): string
+	{
+		return GenericAutoPrompt::class;
+	}
+
     public function onEnter(): void
     {
 		dd(__LINE__);
@@ -36,7 +45,7 @@ class ExtractState extends AbstractState
 		dd(__LINE__);
 	}
 
-	public function dispatchJob($job)
+	public function dispatchJob($job) : string
 	{
 		dd(__LINE__);
 		$jobInstance = dispatch($job);
@@ -49,7 +58,7 @@ class ExtractState extends AbstractState
 		return $jobId;
 	}
 
-	public function updateJobStatus($status)
+	public function updateJobStatus($status) : void
 	{
 		dd(__LINE__);
 
@@ -64,7 +73,7 @@ class ExtractState extends AbstractState
 		return Arr::get($metadata, 'job_status', null);
 	}
 
-	public function getJobId()
+	public function getJobId() : ?string
 	{
 		dd(__LINE__);
 

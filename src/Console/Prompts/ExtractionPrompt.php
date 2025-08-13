@@ -23,7 +23,7 @@ class ExtractionPrompt extends AbstractPrompt
 	protected function displayExtractionStatus(?string $status, array $metadata): void
 	{
 
-		$this->info(__('Current state').': '.$this->record->state);
+		$this->command->state($this->record->state);
 
 		switch ($status) {
 			case 'waiting_for_workers':

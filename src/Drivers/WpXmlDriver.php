@@ -5,7 +5,7 @@ namespace Crumbls\Importer\Drivers;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Resolvers\FileSourceResolver;
 use Crumbls\Importer\States\CompletedState;
-use Crumbls\Importer\States\CreateStorageState;
+use Crumbls\Importer\States\Shared\CreateStorageState;
 use Crumbls\Importer\States\FailedState;
 use Crumbls\Importer\States\WordPressDriver\FactoryBuilderState;
 use Crumbls\Importer\States\WordPressDriver\MappingState;

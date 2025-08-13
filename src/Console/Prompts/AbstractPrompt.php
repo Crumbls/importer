@@ -2,13 +2,71 @@
 
 namespace Crumbls\Importer\Console\Prompts;
 
+use Crumbls\Importer\Console\Prompts\AutoDriver\PendingStatePrompt;
+use Crumbls\Importer\Console\Prompts\Contracts\MigrationPrompt;
+use Illuminate\Support\Facades\Log;
+use PhpTui\Term\Event;
+use Crumbls\Importer\Console\NavItem;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Illuminate\Console\Command;
+use PhpTui\Term\KeyCode;
+use Symfony\Component\Console\Question\Question;
+
+use PhpTui\Term\Event\CharKeyEvent;
+use PhpTui\Term\Event\CodedKeyEvent;
+use PhpTui\Term\Event\MouseEvent;
+use PhpTui\Term\Event\TerminalResizedEvent;
 
 abstract class AbstractPrompt
 {
 	public function __construct(protected Command $command, protected ?ImportContract $record = null)
 	{
+	}
+
+
+	public static function build(Command $command, ?ImportContract $record = null) : MigrationPrompt {
+		return new static($command, $record);
+	}
+
+	public static function breadcrumbs() : array{
+		// Simple implementation to avoid recursion
+		return [];
+	}
+
+
+	public function handleInput(Event $event, Command $command) {
+		$activePrompt = $command->getPrompt();
+
+		if ($event instanceof CharKeyEvent) {
+			if ($event->char === 'q') {
+				/**
+				 * TODO: Handle any saving....
+				 */
+				$command->stopLoop();
+				return;
+			}
+		} else if ($event instanceof CodedKeyEvent) {
+			if ($event->code === KeyCode::Tab) {
+				$tabs = $activePrompt->breadcrumbs();
+				$keys = array_keys($tabs);
+				$x = array_search($activePrompt, $keys);
+				if (!$x) {
+					return;
+				}
+				$key = $keys[$x-1];
+				return;
+			} else if ($event->code === KeyCode::BackTab) {
+				Log::info(__LINE__);
+				exit;
+			} else {
+				$command->error($event->code->name);
+				Log::info(__LINE__);
+				exit;
+			}
+		} else if ($event instanceof TerminalResizedEvent) {
+		} else if ($event instanceof MouseEvent) {
+		} else {
+		}
 	}
 
 	/**
@@ -28,17 +86,11 @@ abstract class AbstractPrompt
 		//$this->record->clearStateMachine();
 		$stateMachine = $this->record->getStateMachine();
 		$driverConfigClass = $this->record->driver;
-		dd($driverConfigClass);
 		$preferredTransitions = $driverConfigClass::config()->getPreferredTransitions();
 
 		$state = $this->record->state;
 		if (array_key_exists($state, $preferredTransitions)) {
-			dd($preferredTransitions[$state]);
-			}
+			$stateMachine->transitionTo($preferredTransitions[$state]);
+		}
 	}
-
-	/**
-	 * Render the prompt - must be implemented by subclasses
-	 */
-	abstract public function render();
 }

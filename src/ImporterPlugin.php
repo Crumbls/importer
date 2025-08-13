@@ -16,7 +16,7 @@ class ImporterPlugin implements Plugin
     {
         $panel
             ->resources([
-                \Crumbls\Importer\Filament\Resources\ImportResource::class,
+//                \Crumbls\Importer\Filament\Resources\ImportResource::class,
             ])
             ->pages([
                 // Register Filament pages here

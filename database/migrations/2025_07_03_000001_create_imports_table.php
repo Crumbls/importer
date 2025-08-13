@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
 	public function getTableName() : string {
-		$modelClass = ModelResolver::import();
-		return with(new $modelClass())->getTable();
+		// Use default table name during migrations to avoid dependency issues
+		return 'imports';
 	}
 
     public function up(): void

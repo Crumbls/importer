@@ -3,9 +3,17 @@
 namespace Crumbls\Importer\States\WpXmlDriver;
 
 use Crumbls\Importer\States\PendingState as BaseState;
+use Crumbls\Importer\Console\Prompts\Shared\GenericAutoPrompt;
 
 class PendingState extends BaseState
 {
+	/**
+	 * Get the prompt class for viewing this state
+	 */
+	public function getPromptClass(): string
+	{
+		return GenericAutoPrompt::class;
+	}
 
 	public function onEnter(): void
 	{
@@ -19,5 +27,4 @@ class PendingState extends BaseState
 		$this->transitionToNextState($record);
 		return true;
 	}
-
 }

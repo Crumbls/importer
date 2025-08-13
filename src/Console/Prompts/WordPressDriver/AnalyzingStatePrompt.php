@@ -15,13 +15,10 @@ class AnalyzingStatePrompt extends AbstractPrompt
 	{
 		$this->clearScreen();
 
-		$this->info(__('Current state').': '.$this->record->state);
+		$this->command->state($this->record->state);
 
-		dd(__LINE__);
-		$this->clearScreen();
-
-		$this->info(__('Current state').': '.$this->record->state);
-exit;
+		Log::info(__LINE__);
+		exit;
 		$stateMachine = $this->record->getStateMachine();
 		$driverConfigClass = $this->record->driver;
 

@@ -14,7 +14,9 @@ use Crumbls\Importer\States\Contracts\ImportStateContract;
 use Crumbls\StateMachine\Exceptions\StateSerializationException;
 use Crumbls\StateMachine\StateMachine;
 use Crumbls\StateMachine\Traits\HasStateMachine;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -63,7 +65,7 @@ class Import extends Model implements ImportContract
 	    'scope_conditions' => 'array',
     ];
 
-	public static function booted() {
+	public static function booted() : void{
 		static::creating(function(ImportContract $record) {
 			if (!$record->driver || !class_exists($record->driver)) {
 				$record->driver = config('importer.default_driver', AutoDriver::class);
@@ -94,12 +96,12 @@ class Import extends Model implements ImportContract
 		});
 	}
 
-    public function scopeByDriver($query, string $driver)
+    public function scopeByDriver($query, string $driver) : Builder
     {
         return $query->where('driver', $driver);
     }
 
-    public function scopeByState($query, string $state)
+    public function scopeByState($query, string $state) : Builder
     {
         return $query->where('state', $state);
     }
@@ -137,7 +139,7 @@ class Import extends Model implements ImportContract
 	/**
 	 * Get the current state machine instance
 	 */
-	public function getStateMachine(): \Crumbls\StateMachine\StateMachine
+	public function getStateMachine(): StateMachine
 	{
 		return $this->stateMachine();
 	}
@@ -253,7 +255,7 @@ class Import extends Model implements ImportContract
 	/**
 	 * Get active model mappings for this import
 	 */
-	public function activeMaps()
+	public function activeMaps() : Collection
 	{
 		return $this->modelMaps()->active();
 	}
@@ -261,7 +263,7 @@ class Import extends Model implements ImportContract
 	/**
 	 * Get model mappings for a specific driver
 	 */
-	public function mapsForDriver(string $driver)
+	public function mapsForDriver(string $driver) : Collection
 	{
 		return $this->modelMaps()->forDriver($driver);
 	}
@@ -269,20 +271,20 @@ class Import extends Model implements ImportContract
 	/**
 	 * Get model mappings for a specific source table
 	 */
-	public function mapsForTable(string $table)
+	public function mapsForTable(string $table) : Collection
 	{
 		return $this->modelMaps()->forSourceTable($table);
 	}
 
 	// In ImportModelMap
-	public function addScope(string $field, $value, string $operator = '=')
+	public function addScope(string $field, $value, string $operator = '=') : void
 	{
 		$conditions = $this->scope_conditions ?? [];
 		$conditions[] = [$field, $operator, $value];
 		$this->update(['scope_conditions' => $conditions]);
 	}
 
-	public function addLimit(int $limit)
+	public function addLimit(int $limit) : void
 	{
 		$this->update(['data_limit' => $limit]);
 	}

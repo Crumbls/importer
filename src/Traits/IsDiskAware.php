@@ -3,12 +3,13 @@
 namespace Crumbls\Importer\Traits;
 
 use Exception;
+use Error;
 use Illuminate\Support\Facades\Storage;
 
 trait IsDiskAware
 {
 
-	protected function getAvailableDisks(): array
+	public function getAvailableDisks(): array
 	{
 		return once(function() {
 
@@ -27,6 +28,10 @@ trait IsDiskAware
 
 					return true;
 				} catch (Exception $e) {
+					// Catch any remaining errors (network issues, config problems, etc.)
+					return false;
+				} catch (Error $e) {
+					// Catch fatal errors like class not found that might slip through
 					return false;
 				}
 			});
@@ -44,7 +49,8 @@ trait IsDiskAware
 				return true;
 
 			case 's3':
-				return class_exists('League\Flysystem\AwsS3V3\AwsS3V3Adapter') ||
+				return class_exists('League\Flysystem\AwsS3V3\AwsS3V3Adapter') &&
+					class_exists('League\Flysystem\AwsS3V3\PortableVisibilityConverter') &&
 					class_exists('Aws\S3\S3Client');
 
 			case 'rackspace':
@@ -68,7 +74,8 @@ trait IsDiskAware
 				return class_exists('League\Flysystem\GoogleCloudStorage\GoogleCloudStorageAdapter');
 
 			default:
-				return true;
+				// For unknown drivers, assume they're not supported to be safe
+				return false;
 		}
 	}
 }

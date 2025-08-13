@@ -20,7 +20,6 @@ class ImportModelMap extends Model implements ImportModelMapContract
         'target_table',
         'field_mappings',
         'transformation_rules',
-        'driver',
         'is_active',
         'priority',
         'metadata',
@@ -202,7 +201,7 @@ class ImportModelMap extends Model implements ImportModelMapContract
     /**
      * Scope to specific source table
      */
-    public function scopeForSourceTable($query, string $table)
+    public function scopeForSourceTable($query, string $table) : Builder
     {
         return $query->where('source_table', $table);
     }
@@ -210,7 +209,7 @@ class ImportModelMap extends Model implements ImportModelMapContract
     /**
      * Order by priority
      */
-    public function scopeOrderedByPriority($query)
+    public function scopeOrderedByPriority($query) : Builder
     {
         return $query->orderBy('priority', 'asc');
     }
@@ -400,26 +399,7 @@ class ImportModelMap extends Model implements ImportModelMapContract
     {
         return $this->destination_info['table_name'] ?? $this->target_table;
     }
-    
-    /**
-     * Check if this mapping is ready for implementation
-     */
-    public function isReadyForImplementation(): bool
-    {
-        $required = [
-            'destination_info',
-            'schema_mapping'
-        ];
-        
-        foreach ($required as $field) {
-            if (empty($this->$field)) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-    
+
     /**
      * Get a summary of this mapping (enhanced)
      */
@@ -439,9 +419,31 @@ class ImportModelMap extends Model implements ImportModelMapContract
             'has_conflict' => $this->hasModelConflict(),
             'conflict_strategy' => $this->getConflictStrategy(),
             'is_active' => $this->isActive(),
-            'is_ready' => $this->isReadyForImplementation(),
+            'is_ready' => $this->isReady(),
             'priority' => $this->priority,
             'driver' => $this->driver
         ];
     }
+
+	public function isReady() : bool {
+		$required = [
+			'destination_info',
+			'target_model', 'target_table', 'schema_mapping'];
+
+
+		foreach ($required as $field) {
+			if (empty($this->$field)) {
+				return false;
+			}
+		}
+
+		$conflictResolution = $this->conflict_resolution ?? [];
+		$hasConflict = $conflictResolution['conflict_detected'] ?? false;
+
+		if ($hasConflict) {
+			return false;
+		}
+
+		return true;
+	}
 }

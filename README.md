@@ -2,9 +2,10 @@
 
 A Laravel 12+ and Filament 4+ package for importing data with state machine-driven workflows.
 
+
 ## Status
 
-**Early Beta** - This package is under active development and not yet ready for production use.
+**Early Beta** - This package is under active development and not anywhere near ready for production use.
 
 ## Features
 
@@ -33,25 +34,10 @@ composer require crumbls/importer
 1. **Install the plugin** in your Filament panel:
 
 ```php
-// In your PanelProvider
-use Crumbls\Importer\ImporterPlugin;
+php artisan importer:install
 
-public function panel(Panel $panel): Panel
-{
-    return $panel
-        ->plugins([
-            ImporterPlugin::make(),
-        ]);
-}
+php artisan importer
 ```
-
-2. **Run migrations**:
-
-```bash
-php artisan migrate
-```
-
-3. **Use the interface**: Navigate to the Imports section in your Filament admin panel to create and manage imports through the user-friendly interface.
 
 ## Architecture
 
@@ -86,3 +72,17 @@ MIT License. See LICENSE file for details.
 ## Support
 
 For issues and questions, please use the GitHub issue tracker.
+
+---
+
+### Compatibility Notes
+- **Unix-like Terminals (macOS, Linux, WSL, SSH):**
+  - Works in most modern terminal emulators (iTerm2, GNOME Terminal, macOS Terminal, Alacritty, etc.)
+  - Uses ANSI escape codes and the alternate screen buffer for a clean experience
+- **Windows:**
+  - Modern Windows Terminal and WSL are supported
+  - Legacy cmd.exe and older PowerShell versions may not support ANSI escapes or alternate buffer, and TUI may not render correctly
+  - Recommend using Windows Terminal or WSL for best results
+- **tmux/screen:**
+  - Supported if alternate buffer is enabled (default)
+

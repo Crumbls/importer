@@ -72,7 +72,7 @@ class SchemaDefinition
         return $this;
     }
     
-    public function index(string|array $columns, string $name = null): self
+    public function index(string|array $columns, ?string $name = null): self
     {
         $this->indexes[] = [
             'type' => 'index',

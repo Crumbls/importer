@@ -1,7 +1,8 @@
 <?php
 
-namespace Crumbls\Importer\States;
+namespace Crumbls\Importer\States\Shared;
 
+use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\Console\Prompts\FailedPrompt;
 
 class FailedState extends AbstractState

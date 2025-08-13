@@ -17,6 +17,14 @@ use Filament\Notifications\Notification;
 class PendingState extends BaseState
 {
 
+    /**
+     * Get the prompt class for viewing this state
+     */
+    public function getPromptClass(): string
+    {
+        return PendingStatePrompt::class;
+    }
+
     // Auto-transition configuration
     protected int $autoTransitionPollingInterval = 1000; // 1 second
     protected int $autoTransitionDelay = 2; // 2 seconds
@@ -112,5 +120,4 @@ class PendingState extends BaseState
 	public function onExit() : void {
 
 	}
-
 }

@@ -56,7 +56,7 @@ abstract class AbstractState extends State implements ImportStateContract
     /**
      * Get state data from the import metadata
      */
-    public function getStateData(string $key)
+    public function getStateData(string $key) : ?array
     {
         try {
             $import = $this->getRecord();
@@ -102,6 +102,18 @@ abstract class AbstractState extends State implements ImportStateContract
     // UI CONTENT METHODS (for page delegation)
     // =========================================================================
 
+    /**
+     * Get the prompt class that should handle displaying this state
+     * States can override this to provide state-specific prompts
+     * 
+     * @return string Class name of the prompt to use for viewing this state
+     */
+	/*
+    public function getPromptClass(): string
+    {
+        return StateInformerPrompt::class; // Default to generic state informer
+    }
+*/
 
     // =========================================================================
     // STATE TRANSITIONS
@@ -220,8 +232,9 @@ abstract class AbstractState extends State implements ImportStateContract
     {
         // States can override for custom validation error handling
     }
-
+/*
 	public static function getCommandPrompt() : string {
 		return StateInformerPrompt::class;
 	}
+*/
 }

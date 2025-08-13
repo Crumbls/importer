@@ -10,4 +10,5 @@ interface ImportModelMapContract
 {
     public function import(): BelongsTo;
 
+	public function isReady() : bool;
 }

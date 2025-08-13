@@ -3,13 +3,6 @@
 namespace Crumbls\Importer\States\WordPressDriver;
 
 use Crumbls\Importer\States\AbstractState;
-use Crumbls\Importer\Filament\Pages\GenericInfolistPage;
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\KeyValueEntry;
-use Filament\Infolists\Components\Actions;
-use Filament\Infolists\Components\Actions\Action;
 use Illuminate\Support\Facades\File;
 
 class TransformReviewState extends AbstractState
@@ -200,108 +193,7 @@ class TransformReviewState extends AbstractState
             return false;
         }
     }
-    
-    public function getRecommendedPageClass(): string
-    {
-        return GenericInfolistPage::class;
-    }
-    
-    public function infolist(Schema $schema): Schema
-    {
-        $reviewData = $this->getStateData('transform_review');
-        
-        if (!$reviewData) {
-            return $schema->components([
-                TextEntry::make('error')
-                    ->label('Error')
-                    ->default('No review data available.')
-            ]);
-        }
-        
-        return $schema->components([
-            Section::make('Transformation Summary')
-                ->schema([
-                    TextEntry::make('models_configured')
-                        ->label('Models Configured')
-                        ->default($reviewData['models_configured'] ?? 0),
-                        
-                    TextEntry::make('migrations_count')
-                        ->label('Migrations Created')
-                        ->default(count($reviewData['migrations_created'] ?? [])),
-                        
-                    TextEntry::make('factories_count')
-                        ->label('Factories Created')
-                        ->default(count($reviewData['factories_created'] ?? [])),
-                        
-                    TextEntry::make('ready_status')
-                        ->label('Ready for Load')
-                        ->default($reviewData['ready_for_load'] ? '✅ Yes' : '❌ No')
-                        ->color(fn() => $reviewData['ready_for_load'] ? 'success' : 'danger'),
-                ]),
-                
-            Section::make('Required Actions')
-                ->schema([
-                    TextEntry::make('migration_commands')
-                        ->label('Migration Commands')
-                        ->default($this->formatCommands($reviewData['migration_commands'] ?? []))
-                        ->html(),
-                ])
-                ->visible(fn() => !empty($reviewData['migration_commands'])),
-                
-            Section::make('Next Steps')
-                ->schema([
-                    KeyValueEntry::make('next_steps')
-                        ->label('Action Plan')
-                        ->keyLabel('Step')
-                        ->valueLabel('Description')
-                        ->default($this->formatNextSteps($reviewData['next_steps'] ?? [])),
-                ]),
-                
-            Section::make('Warnings')
-                ->schema([
-                    TextEntry::make('warnings_list')
-                        ->label('Important Notes')
-                        ->default($this->formatWarnings($reviewData['warnings'] ?? []))
-                        ->html(),
-                ])
-                ->visible(fn() => !empty($reviewData['warnings'])),
-                
-            Section::make('Created Files')
-                ->schema([
-                    KeyValueEntry::make('migrations_created')
-                        ->label('Migration Files')
-                        ->keyLabel('Post Type')
-                        ->valueLabel('File Path')
-                        ->default($this->formatCreatedFiles($reviewData['migrations_created'] ?? []))
-                        ->visible(fn() => !empty($reviewData['migrations_created'])),
-                        
-                    KeyValueEntry::make('factories_created')
-                        ->label('Factory Files')
-                        ->keyLabel('Post Type')
-                        ->valueLabel('File Path')
-                        ->default($this->formatCreatedFiles($reviewData['factories_created'] ?? []))
-                        ->visible(fn() => !empty($reviewData['factories_created'])),
-                ]),
-                
-            Actions::make([
-                Action::make('continue_to_load')
-                    ->label('Continue to Data Loading')
-                    ->color('primary')
-                    ->action(function () {
-                        $this->transitionTo(LoadState::class);
-                    })
-                    ->visible(fn() => $reviewData['ready_for_load'] ?? false),
-                    
-                Action::make('back_to_migrations')
-                    ->label('Review Migrations')
-                    ->color('gray')
-                    ->action(function () {
-                        $this->transitionTo(TransformMigrationsState::class);
-                    }),
-            ]),
-        ]);
-    }
-    
+
     protected function formatCommands(array $commands): string
     {
         $formatted = [];
@@ -358,11 +250,5 @@ class TransformReviewState extends AbstractState
         }
         
         return $formatted;
-    }
-    
-    public function handleFilamentFormSave(array $data): void
-    {
-        // This state is primarily informational, so we just transition to load
-        $this->transitionTo(LoadState::class);
     }
 }

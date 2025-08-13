@@ -3,6 +3,9 @@
 namespace Crumbls\Importer;
 
 use Crumbls\Importer\Console\ImporterCommand;
+use Crumbls\Importer\Console\InstallCommand;
+use Crumbls\Importer\Console\SimpleTuiDemo;
+use Crumbls\Importer\Console\InteractiveTuiDemo;
 use Crumbls\Importer\Events\ImportServiceInitialized;
 use Crumbls\Importer\Events\StorageServiceInitialized;
 use Crumbls\Importer\Listeners\RegisterImportDrivers;
@@ -41,6 +44,10 @@ class ImporterServiceProvider extends PackageServiceProvider
 		if ($this->app->runningInConsole()) {
 			$this->commands([
 				ImporterCommand::class,
+InstallCommand::class,
+SimpleTuiDemo::class
+//				SimpleTuiDemo::class,
+//				InteractiveTuiDemo::class,
 			]);
 		}
 	}
