@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer;
 
+use Crumbls\Importer\Filament\Resources\Imports\ImportResource;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 
@@ -16,7 +17,7 @@ class ImporterPlugin implements Plugin
     {
         $panel
             ->resources([
-//                \Crumbls\Importer\Filament\Resources\ImportResource::class,
+				ImportResource::class
             ])
             ->pages([
                 // Register Filament pages here

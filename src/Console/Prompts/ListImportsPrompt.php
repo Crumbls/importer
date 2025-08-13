@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\Console\Prompts;
 
+use Crumbls\Importer\Console\NavItem;
 use Crumbls\Importer\Console\Prompts\AbstractPrompt;
 use Crumbls\Importer\Console\Prompts\Contracts\MigrationPrompt;
 use Crumbls\Importer\Console\Prompts\CreateImportPrompt\SourcePrompt;
@@ -185,6 +186,13 @@ class ListImportsPrompt extends AbstractPrompt implements MigrationPrompt
 
 	public static function getTabTitle() : string {
 		return 'List Imports';
+	}
+
+	public static function breadcrumbs() : array{
+		$base = [
+ListImportsPrompt::class => new NavItem(ListImportsPrompt::class, static::getTabTitle())
+		];
+		return $base;
 	}
 
 }

@@ -11,6 +11,7 @@ use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Resolvers\ModelResolver;
 use Crumbls\Importer\Console\Prompts\Contracts\MigrationPrompt;
 use Crumbls\Importer\Services\ImportService;
+use Illuminate\Support\Facades\Log;
 use PhpTui\Tui\Extension\Core\Widget\Block\Padding;
 use \PhpTui\Tui\Extension\Core\Widget\BlockWidget;
 use PhpTui\Tui\Extension\Core\Widget\ParagraphWidget;
@@ -131,7 +132,7 @@ class SourcePrompt extends AbstractPrompt implements MigrationPrompt {
 
 	public static function breadcrumbs() : array{
 		$base = ListImportsPrompt::breadcrumbs();
-		$base[SourcePrompt::class] = new NavItem(SourcePrompt::class, 'Create Import');
+		$base[SourcePrompt::class] = new NavItem(SourcePrompt::class, static::getTabTitle());
 		return $base;
 	}
 
@@ -199,7 +200,12 @@ class SourcePrompt extends AbstractPrompt implements MigrationPrompt {
 
 	public function handleInput(Event $event, Command $command)
 	{
-		if ($event instanceof Event\CodedKeyEvent) {
+		if ($event instanceof Event\CharKeyEvent) {
+			if ($event->char === 'q') {
+				$command->stopLoop();
+				return;
+			}
+		} else if ($event instanceof Event\CodedKeyEvent) {
 			switch ($event->code) {
 				case KeyCode::Left:
 					$this->focusLeft();
@@ -220,14 +226,12 @@ class SourcePrompt extends AbstractPrompt implements MigrationPrompt {
 						$command->setPrompt(FilePrompt::class); // Fallback for now
 					}
 					return;
-					
+
 				case KeyCode::Esc:
 					$command->setPrompt(ListImportsPrompt::class);
 					return;
 			}
 		}
-
-		parent::handleInput($event, $command);
 	}
 
 	protected static function switchTabRight(Command $command) : void {

@@ -29,7 +29,7 @@ use PhpTui\Tui\Color\AnsiColor;
 use PhpTui\Term\Event;
 use PhpTui\Term\KeyCode;
 
-class MainPrompt extends AbstractPrompt implements MigrationPrompt
+class MainPrompt extends AbstractMappingPrompt implements MigrationPrompt
 {
     private int $currentTab = 0;
     private int $selectedRow = 0;
@@ -48,99 +48,10 @@ class MainPrompt extends AbstractPrompt implements MigrationPrompt
 
     public function handleInput(Event $event, Command $command)
     {
-        if ($event instanceof Event\CharKeyEvent) {
-            match($event->char) {
-                'q' => parent::handleInput($event, $command),
-                'c' => $this->continueToNextState(),
-                default => $this->handleFocusedInput($event->char)
-            };
-        } elseif ($event instanceof Event\CodedKeyEvent) {
-            match($event->code) {
-                KeyCode::Esc => $this->command->setPrompt(ListImportsPrompt::class),
-                KeyCode::Tab => $this->toggleFocus(),
-                KeyCode::Enter => $this->handleEnter(),
-                default => $this->handleFocusedInput($event->code)
-            };
-        }
+        $this->baseHandleInput($event, $command);
     }
     
-    private function toggleFocus(): void
-    {
-        $this->focusOnTabs = !$this->focusOnTabs;
-    }
-    
-    private function handleFocusedInput($input): void
-    {
-        if ($this->focusOnTabs) {
-            // Tab navigation mode
-            if ($input === 'j' || $input === KeyCode::Down) {
-                $this->nextTab();
-            } elseif ($input === 'k' || $input === KeyCode::Up) {
-                $this->previousTab();
-            }
-        } else {
-            // Content navigation mode  
-            if ($input === 'j' || $input === KeyCode::Down) {
-                $this->moveDown();
-            } elseif ($input === 'k' || $input === KeyCode::Up) {
-                $this->moveUp();
-            } elseif ($input === 'h' || $input === KeyCode::Left) {
-                $this->moveUp();
-            } elseif ($input === 'l' || $input === KeyCode::Right) {
-                $this->moveDown();
-            }
-        }
-    }
-
-    private function previousTab(): void
-    {
-        $this->currentTab = max(0, $this->currentTab - 1);
-        $this->resetSelection();
-    }
-
-    private function nextTab(): void
-    {
-        $this->currentTab = min(count($this->tabs) - 1, $this->currentTab + 1);
-        $this->resetSelection();
-    }
-
-    private function moveUp(): void
-    {
-        if ($this->selectedRow > 0) {
-            $this->selectedRow--;
-            $this->adjustScroll();
-        }
-    }
-
-    private function moveDown(): void
-    {
-        $maps = $this->getImportModelMaps();
-        $maxRow = count($maps) - 1;
-        
-        if ($this->selectedRow < $maxRow) {
-            $this->selectedRow++;
-            $this->adjustScroll();
-        }
-    }
-
-    private function resetSelection(): void
-    {
-        $this->selectedRow = 0;
-        $this->scrollOffset = 0;
-    }
-
-    private function adjustScroll(): void
-    {
-        $visibleRows = 10; // Approximate visible table rows
-        
-        if ($this->selectedRow < $this->scrollOffset) {
-            $this->scrollOffset = $this->selectedRow;
-        } elseif ($this->selectedRow >= $this->scrollOffset + $visibleRows) {
-            $this->scrollOffset = $this->selectedRow - $visibleRows + 1;
-        }
-    }
-
-    private function handleEnter(): void
+    protected function handleEnter(): void
     {
         $maps = $this->getImportModelMaps();
         

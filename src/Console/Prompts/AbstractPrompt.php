@@ -58,6 +58,7 @@ abstract class AbstractPrompt
 				Log::info(__LINE__);
 				exit;
 			} else {
+				throw new \Exception('Unknown event');
 				$command->error($event->code->name);
 				Log::info(__LINE__);
 				exit;

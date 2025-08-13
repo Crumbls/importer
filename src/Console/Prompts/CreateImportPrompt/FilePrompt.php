@@ -190,7 +190,7 @@ class FilePrompt extends AbstractPrompt implements MigrationPrompt
 	public static function breadcrumbs(): array
 	{
 		$base = SourcePrompt::breadcrumbs();
-		$base[FilePrompt::class] = new NavItem(FilePrompt::class, 'File Browser');
+		$base[FilePrompt::class] = new NavItem(FilePrompt::class, static::getTabTitle());
 		return $base;
 	}
 

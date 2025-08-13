@@ -45,9 +45,6 @@ class ViewImportPrompt extends AbstractPrompt implements MigrationPrompt
         if ($currentState instanceof AbstractState) {
             $promptClass = $currentState->getPromptClass();
 
-	        Log::info(__LINE__);
-	        exit;
-
             if (class_exists($promptClass)) {
                 $this->command->setPrompt($promptClass);
                 return;
@@ -69,6 +66,7 @@ class ViewImportPrompt extends AbstractPrompt implements MigrationPrompt
 
     public function tui(): array
     {
+		Log::info(__LINE__);
         // This should never be called since we redirect in constructor
         return [];
     }

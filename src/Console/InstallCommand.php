@@ -69,10 +69,6 @@ $models = ModelResolver::all();
 					return false;
 				}
 				return true;
-				dd(__LINE__);
-				DB::connection($connectionNane)->table($tableName);
-dd($modelClass);
-
 			}
 		});
         $modelName = config('Importer.models.ticket', Ticket::class);
