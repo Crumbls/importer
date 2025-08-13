@@ -9,7 +9,7 @@ use Crumbls\Importer\States\Shared\CreateStorageState;
 use Crumbls\Importer\States\CsvDriver\AnalyzingState;
 use Crumbls\Importer\States\CsvDriver\ExtractState;
 use Crumbls\Importer\States\CsvDriver\PendingState;
-use Crumbls\Importer\States\FailedState;
+use Crumbls\Importer\States\Shared\FailedState;
 use Crumbls\Importer\States\Shared\ColumnTypeAnalysisState;
 use Crumbls\Importer\Support\DriverConfig;
 use Exception;

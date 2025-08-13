@@ -448,7 +448,7 @@ Preparing to process your WordPress XML file using optimized streaming technolog
                 'escape' => $record->metadata['escape'] ?? '\\',
 				'headers' => $record->metadata['headers'],
 				'headers_first_row' => $record->metadata['headers_first_row'],
-                'progress_callback' => function($processed) use ($record) {
+                'progress_callback' => function($processed)  {
                 },
                 'memory_callback' => null,
             ]);

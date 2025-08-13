@@ -5,7 +5,7 @@ namespace Crumbls\Importer\Drivers;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\States\AutoDriver\AnalyzingState;
 use Crumbls\Importer\States\AutoDriver\PendingState;
-use Crumbls\Importer\States\FailedState;
+use Crumbls\Importer\States\Shared\FailedState;
 use Crumbls\Importer\Support\DriverConfig;
 
 class AutoDriver extends AbstractDriver

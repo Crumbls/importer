@@ -5,7 +5,7 @@ namespace Crumbls\Importer\Drivers;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\States\AutoDriver\AnalyzingState;
 use Crumbls\Importer\States\CompletedState;
-use Crumbls\Importer\States\FailedState;
+use Crumbls\Importer\States\Shared\FailedState;
 use Crumbls\Importer\States\XmlDriver\PendingState;
 use Crumbls\Importer\Support\DriverConfig;
 use Exception;

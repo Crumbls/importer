@@ -4,7 +4,7 @@ namespace Crumbls\Importer\Support;
 
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\States\CompletedState;
-use Crumbls\Importer\States\FailedState;
+use Crumbls\Importer\States\Shared\FailedState;
 use Crumbls\StateMachine\StateMachine;
 
 class StateMachineRunner

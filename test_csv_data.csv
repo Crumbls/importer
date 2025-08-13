@@ -1,0 +1,6 @@
+name,email,phone,created_at,status,amount
+John Doe,john@example.com,555-1234,2025-01-01,active,150.00
+Jane Smith,jane@example.com,555-5678,2025-01-02,pending,75.50
+Bob Johnson,bob@example.com,555-9012,2025-01-03,active,200.25
+Alice Brown,alice@example.com,555-3456,2025-01-04,inactive,0.00
+Charlie Wilson,charlie@example.com,555-7890,2025-01-05,active,300.75

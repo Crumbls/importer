@@ -71,6 +71,8 @@ continue;
 		$this->command->newLine();
 		$this->command->info("Press Enter to continue...");
 		text('', hint: 'Press Enter...');
+		
+		return ''; // Method handles console output directly
 	}
 
 

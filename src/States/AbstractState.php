@@ -3,6 +3,7 @@
 namespace Crumbls\Importer\States;
 
 use Crumbls\Importer\Console\Prompts\StateInformerPrompt;
+use Crumbls\Importer\Console\Prompts\Shared\GenericAutoPrompt;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\States\Contracts\ImportStateContract;
 use Crumbls\StateMachine\State;
@@ -108,12 +109,14 @@ abstract class AbstractState extends State implements ImportStateContract
      * 
      * @return string Class name of the prompt to use for viewing this state
      */
-	/*
+    /**
+     * Default prompt class for states that don't need custom TUI
+     * Override this in states that need specific prompts
+     */
     public function getPromptClass(): string
     {
-        return StateInformerPrompt::class; // Default to generic state informer
+        return GenericAutoPrompt::class; // Default to auto-continuing prompt
     }
-*/
 
     // =========================================================================
     // STATE TRANSITIONS

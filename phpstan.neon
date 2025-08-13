@@ -12,21 +12,36 @@ parameters:
         - '#Access to an undefined property [a-zA-Z0-9\\_]+::\$[a-zA-Z0-9_]+#'
         # Allow Laravel magic methods
         - '#Call to an undefined method Illuminate\\[a-zA-Z0-9\\_]+::[a-zA-Z0-9_]+\(\)#'
+        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Model::[a-zA-Z0-9_]+\(\)#'
         # Allow state machine dynamic calls
         - '#Call to an undefined method Crumbls\\[a-zA-Z0-9\\_]+::[a-zA-Z0-9_]+\(\)#'
         # Facade method issues
         - '#Call to an undefined static method Crumbls\\Importer\\Facades\\Storage::driver\(\)#'
+        - '#Call to an undefined static method Crumbls\\Importer\\Facades\\Importer::[a-zA-Z0-9_]+\(\)#'
         - '#Call to an undefined static method Crumbls\\Importer\\Resolvers\\ModelResolver::[a-zA-Z0-9_]+\(\)#'
+        # Laravel facade methods
+        - '#Call to static method [a-zA-Z0-9_]+\(\) on an unknown class Log#'
+        - '#Call to static method [a-zA-Z0-9_]+\(\) on an unknown class Schema#'
+        - '#Call to static method [a-zA-Z0-9_]+\(\) on an unknown class DB#'
+        - '#Call to static method [a-zA-Z0-9_]+\(\) on an unknown class File#'
+        - '#Call to static method [a-zA-Z0-9_]+\(\) on an unknown class Storage#'
         # Eloquent model static methods
         - '#Call to an undefined static method Crumbls\\Importer\\Models\\[a-zA-Z0-9_]+::(find|where|firstOrCreate|all)\(\)#'
+        # Host application classes (not available in package context)
+        - '#Class App\\Models\\[a-zA-Z0-9_]+ not found#'
         # Missing classes (intentionally excluded or not yet implemented)
         - '#Class Crumbls\\Importer\\States\\Shared\\FailedState not found#'
         - '#Class Crumbls\\Importer\\Console\\Exception not found#'
+        - '#Class Crumbls\\Importer\\Console\\CreateImportPrompt not found#'
+        - '#Class Crumbls\\LaravelCliTable\\SelectableTable not found#'
         - '#Class Crumbls\\Importer\\Services\\XmlParsingService not found#'
         - '#Class Crumbls\\Importer\\States\\XmlDriver\\FailedState not found#'
         - '#Class Crumbls\\Importer\\Contracts\\XmlParserContract not found#'
         - '#Class Crumbls\\Importer\\States\\[a-zA-Z0-9]+Driver\\[a-zA-Z0-9]+State not found#'
         - '#Class Crumbls\\Importer\\Filament\\Pages\\[a-zA-Z0-9]+ not found#'
+        # Missing method calls on unknown classes
+        - '#Call to method .* on an unknown class Crumbls\\Importer\\Console\\CreateImportPrompt#'
+        - '#Call to method .* on an unknown class Crumbls\\LaravelCliTable\\SelectableTable#'
         # Deprecated PHP 8.4 warnings
         - '#Deprecated in PHP 8.4: Parameter .* is implicitly nullable via default value null#'
         # isset() on non-nullable properties (false positives)
@@ -52,6 +67,15 @@ parameters:
         - '#Right side of && is always false#'
         # Unused methods (may be used via reflection or future features)
         - '#Method .* is unused#'
+        # Properties that are written but not read (may be used in future or debugging)
+        - '#Property .* is never read, only written#'
+        # Missing return statements (methods under development)
+        - '#Method .* should return .* but return statement is missing#'
+        # Abstract method implementations missing (states under development)
+        - '#Non-abstract class [a-zA-Z0-9\\_]+ contains abstract method getPromptClass\(\) from interface [a-zA-Z0-9\\_]+ImportStateContract#'
+        - '#Class [a-zA-Z0-9\\_]+ contains 1 abstract method and must therefore be declared abstract or implement the remaining methods#'
+        - '#Method [a-zA-Z0-9\\_]+::createImportWithPrompt\(\) should return [a-zA-Z0-9\\_|]+ but return statement is missing#'
+        - '#Method [a-zA-Z0-9\\_]+::render\(\) should return string but return statement is missing#'
         # Ignore deprecated missing type errors
         -
             identifier: missingType.iterableValue

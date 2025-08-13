@@ -19,9 +19,11 @@
         "php": "^8.2",
         "crumbls/state-machine": "*",
         "laravel/framework": "^12.0",
+        "php-tui/php-tui": "^0.2.1",
         "spatie/laravel-package-tools": "^1.16"
     },
     "require-dev": {
+        "laravel/boost": "^1.0",
         "orchestra/testbench": "^10.0",
         "pestphp/pest": "^3.8.0",
         "pestphp/pest-plugin-laravel": "^3.0",

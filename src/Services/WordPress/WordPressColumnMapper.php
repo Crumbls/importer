@@ -133,8 +133,6 @@ class WordPressColumnMapper
             '_menu_item_url' => 'url',
             '_menu_item_description' => 'description',
             
-            // Advanced Custom Fields
-            'field_' => 'acf_',
         ];
 
         // Check for exact matches first

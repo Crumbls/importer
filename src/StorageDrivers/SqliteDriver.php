@@ -438,7 +438,7 @@ class SqliteDriver extends AbstractDriver implements TransactionalStorageContrac
 		return filesize($this->getStorePath());
 	}
 
-	public function db() : SQLiteConnection {
+	public function db() : ConnectionInterface {
 		if (!isset($this->db)) {
 			throw StorageException::connectionFailed('Database connection is not established');
 		}

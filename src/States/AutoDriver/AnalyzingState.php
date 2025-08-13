@@ -8,7 +8,7 @@ use Crumbls\Importer\Facades\Importer;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Console\Prompts\AutoDriver\AnalyzingStatePrompt;
 use Crumbls\Importer\States\AbstractState;
-use Crumbls\Importer\States\FailedState;
+use Crumbls\Importer\States\Shared\FailedState;
 use Illuminate\Support\Arr;
 
 class AnalyzingState extends AbstractState
@@ -80,7 +80,12 @@ class AnalyzingState extends AbstractState
 			$import->update([
 				'state' => FailedState::class
 			]);
-			throw new CompatibleDriverNotFoundException();
+			
+			throw CompatibleDriverNotFoundException::forSource(
+				$import->source_type ?? 'unknown',
+				$import->source_detail ?? '',
+				$availableDrivers
+			);
 		}
 
 		$driverClass = Importer::driver($driver);

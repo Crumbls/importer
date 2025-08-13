@@ -2,7 +2,7 @@
 
 namespace Crumbls\Importer\Resolvers;
 
-use App\Models\User;
+// use App\Models\User; // Removed - not available in package context
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
@@ -47,7 +47,7 @@ class ModelResolver
     {
         return once(function() {
             /** @var class-string<Model>|null $modelClass */
-            $modelClass = Config::get('auth.providers.users.model') ?? User::class;
+            $modelClass = Config::get('auth.providers.users.model') ?? 'App\\Models\\User';
 
             if (!class_exists($modelClass)) {
                 throw new InvalidArgumentException("Model class '{$modelClass}' does not exist.");

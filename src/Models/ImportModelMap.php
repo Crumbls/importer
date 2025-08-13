@@ -5,6 +5,7 @@ namespace Crumbls\Importer\Models;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Models\Contracts\ImportModelMapContract;
 use Crumbls\Importer\Resolvers\ModelResolver;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;

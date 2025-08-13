@@ -7,10 +7,11 @@ use Crumbls\Importer\Resolvers\FileSourceResolver;
 use Crumbls\Importer\States\Concerns\HasStorageDriver;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\States\AbstractState;
+use Crumbls\Importer\States\Contracts\ImportStateContract;
 use Crumbls\Importer\Support\SourceResolverManager;
 use Illuminate\Support\Facades\Log;
 
-class AnalyzingState extends AbstractState
+class AnalyzingState extends AbstractState implements ImportStateContract
 {
     use HasStorageDriver;
 

@@ -9,7 +9,7 @@ use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\Models\ImportModelMap;
 use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\States\CompletedState;
-use Crumbls\Importer\States\FailedState;
+use Crumbls\Importer\States\Shared\FailedState;
 use Crumbls\Importer\States\Concerns\AnalyzesValues;
 use Crumbls\Importer\States\Concerns\StreamingAnalyzesValues;
 use Crumbls\Importer\States\Concerns\HasStorageDriver;

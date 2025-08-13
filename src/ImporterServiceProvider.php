@@ -44,10 +44,7 @@ class ImporterServiceProvider extends PackageServiceProvider
 		if ($this->app->runningInConsole()) {
 			$this->commands([
 				ImporterCommand::class,
-InstallCommand::class,
-SimpleTuiDemo::class
-//				SimpleTuiDemo::class,
-//				InteractiveTuiDemo::class,
+				InstallCommand::class,
 			]);
 		}
 	}
