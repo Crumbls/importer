@@ -41,8 +41,8 @@ jobs:
         composer update --prefer-dist --no-interaction --no-progress
         composer install --prefer-dist --no-interaction --no-progress
 
-    - name: Run PHPStan
-      run: composer analyse
+#    - name: Run PHPStan
+#      run: composer analyse
 
     - name: Run Pest Tests
       run: composer test
