@@ -23,7 +23,6 @@ abstract class AbstractPrompt
 	{
 	}
 
-
 	public static function build(Command $command, ?ImportContract $record = null) : MigrationPrompt {
 		return new static($command, $record);
 	}

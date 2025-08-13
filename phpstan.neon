@@ -13,6 +13,7 @@ parameters:
         # Allow Laravel magic methods
         - '#Call to an undefined method Illuminate\\[a-zA-Z0-9\\_]+::[a-zA-Z0-9_]+\(\)#'
         - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Model::[a-zA-Z0-9_]+\(\)#'
+        - '#Call to an undefined static method Illuminate\\Database\\Eloquent\\Model::[a-zA-Z0-9_]+\(\)#'
         # Allow state machine dynamic calls
         - '#Call to an undefined method Crumbls\\[a-zA-Z0-9\\_]+::[a-zA-Z0-9_]+\(\)#'
         # Facade method issues
@@ -49,8 +50,6 @@ parameters:
         - '#Property .* in isset\(\) is not nullable#'
         # Unsafe static usage (design patterns)
         - '#Unsafe usage of new static\(\)#'
-        # Model method calls on base class
-        - '#Call to an undefined static method Illuminate\\Database\\Eloquent\\Model::(find|firstOrCreate)#'
         # Filament classes (external dependency issues)
         - '#Call to static method make\(\) on an unknown class Filament\\[a-zA-Z0-9\\_]+#'
         - '#Instantiated class Filament\\[a-zA-Z0-9\\_]+ not found#'

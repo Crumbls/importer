@@ -231,9 +231,7 @@ class ImporterCommand extends Command
 
 		return BlockWidget::default()
 			->borders(Borders::ALL)->style(Style::default()->white())
-			->widget(
-
-			);
+			->widget();
 	}
 
 	private function header(): Widget
