@@ -4,6 +4,7 @@ namespace Crumbls\Importer\States;
 
 use Crumbls\Importer\Console\Prompts\StateInformerPrompt;
 use Crumbls\Importer\Console\Prompts\Shared\GenericAutoPrompt;
+use Crumbls\Importer\Exceptions\StateTransitionException;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\States\Contracts\ImportStateContract;
 use Crumbls\StateMachine\State;
@@ -48,7 +49,7 @@ abstract class AbstractState extends State implements ImportStateContract
                 return $import;
             }
             
-            throw new \RuntimeException('Import contract not available in state context. Context: ' . json_encode($context));
+            throw StateTransitionException::contextNotAvailable($context);
         }
 
         return $context['model'];
@@ -163,7 +164,7 @@ abstract class AbstractState extends State implements ImportStateContract
                 $stateMachine->transitionTo($nextState, $this->getContext());
 				$record->update(['state' => $nextState]);
             } else {
-                throw new Exception('No preferred transition found from ' . class_basename(static::class));
+                throw StateTransitionException::noTransitionFound(static::class);
             }
 	}
 

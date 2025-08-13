@@ -3,6 +3,7 @@
 namespace Crumbls\Importer\States\WordPressDriver;
 
 use Crumbls\Importer\Exceptions\CompatibleDriverNotFoundException;
+use Crumbls\Importer\Exceptions\StateTransitionException;
 use Crumbls\Importer\Facades\Importer;
 use Crumbls\Importer\Models\Contracts\ImportContract;
 use Crumbls\Importer\States\AbstractState;
@@ -358,7 +359,7 @@ class MappingState extends BaseState
     protected function analyzePostTypes($storage): array
     {
         if (!method_exists($storage, 'db')) {
-            throw new Exception('Storage driver is not yet valid.');
+            throw StateTransitionException::invalidStorageDriver(static::class);
         }
 
         $connection = $storage->db();

@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\Models\Concerns;
 
+use Crumbls\Importer\Exceptions\SourceException;
 use Crumbls\Importer\Resolvers\FileSourceResolver;
 use Crumbls\Importer\Support\SourceResolverManager;
 
@@ -9,7 +10,7 @@ trait HasSourceResolver {
 	public function getSourceResolver(): SourceResolverManager
 	{
 		if (!$this->source_detail) {
-			throw new \Exception('Source detail is required.');
+			throw SourceException::sourceDetailRequired();
 		}
 
 		$sourceResolver = new SourceResolverManager();
@@ -19,7 +20,7 @@ trait HasSourceResolver {
 		if ($this->source_type == 'storage') {
 			$sourceResolver->addResolver(new FileSourceResolver($sourceType, $this->source_detail));
 		} else {
-			throw new \Exception("Unsupported source type: {$this->source_type}");
+			throw SourceException::unsupportedSourceType($this->source_type);
 		}
 		return $sourceResolver;
 	}

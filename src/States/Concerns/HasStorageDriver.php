@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\States\Concerns;
 
+use Crumbls\Importer\Exceptions\StateTransitionException;
 use Crumbls\Importer\Facades\Storage;
 use Crumbls\Importer\StorageDrivers\Contracts\StorageDriverContract;
 use Exception;
@@ -17,7 +18,7 @@ trait HasStorageDriver
         $metadata = $record->metadata ?? [];
         
         if (!isset($metadata['storage_driver']) || !$metadata['storage_driver']) {
-            throw new Exception('No storage driver configured for import ID: ' . $record->id);
+            throw StateTransitionException::storageNotConfigured($record->id);
         }
         
         return Storage::driver($metadata['storage_driver'])

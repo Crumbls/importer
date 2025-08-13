@@ -2,6 +2,7 @@
 
 namespace Crumbls\Importer\Parsers;
 
+use Crumbls\Importer\Exceptions\ParsingException;
 use Crumbls\Importer\StorageDrivers\Contracts\StorageDriverContract;
 use Crumbls\Importer\Support\SourceResolverManager;
 use Crumbls\Importer\Models\Contracts\ImportContract;
@@ -79,7 +80,7 @@ class CsvStreamParser
 
         $handle = fopen($filePath, 'r');
         if (!$handle) {
-            throw new \RuntimeException('Unable to open CSV file: ' . $filePath);
+            throw ParsingException::fileNotReadable($filePath);
         }
 
         while (($row = fgetcsv($handle, 0, $delimiter, $enclosure, $escape)) !== false) {

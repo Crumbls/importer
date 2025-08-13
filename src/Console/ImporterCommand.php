@@ -4,6 +4,7 @@ namespace Crumbls\Importer\Console;
 
 use Crumbls\Importer\Console\Concerns\HasTui;
 use Crumbls\Importer\Console\Prompts\Contracts\MigrationPrompt;
+use Crumbls\Importer\Exceptions\TuiException;
 use Crumbls\Importer\Console\Prompts\CreateImportPrompt;
 use Crumbls\Importer\Console\Prompts\ListImportsPrompt;
 use Crumbls\Importer\Drivers\AutoDriver;
@@ -212,13 +213,13 @@ class ImporterCommand extends Command
 	public function setPrompt(MigrationPrompt|string $prompt): self {
 		if (is_string($prompt)) {
 			if (!class_exists($prompt)) {
-				throw new \Exception("Prompt class $prompt does not exist");
+				throw TuiException::promptClassNotFound($prompt);
 			} else if (!is_subclass_of($prompt, MigrationPrompt::class)) {
-				throw new \Exception("Prompt class $prompt must implement " . MigrationPrompt::class);
+				throw TuiException::promptClassInvalidInterface($prompt, MigrationPrompt::class);
 			}
 			$prompt = $prompt::build($this, $this->getRecord());
 		} else if (!is_subclass_of($prompt, MigrationPrompt::class)) {
-			throw new \Exception("Prompt class $prompt must implement ".MigrationPrompt::class);
+			throw TuiException::promptClassInvalidInterface($prompt::class, MigrationPrompt::class);
 		}
 
 		$this->activePrompt = $prompt;

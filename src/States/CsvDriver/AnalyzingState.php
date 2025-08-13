@@ -6,6 +6,7 @@ use Crumbls\Importer\Console\Prompts\CsvDriver\ConfigureHeadersPrompt;
 use Crumbls\Importer\Resolvers\FileSourceResolver;
 use Crumbls\Importer\States\Concerns\HasStorageDriver;
 use Crumbls\Importer\Models\Contracts\ImportContract;
+use Crumbls\Importer\Exceptions\StateTransitionException;
 use Crumbls\Importer\States\AbstractState;
 use Crumbls\Importer\States\Contracts\ImportStateContract;
 use Crumbls\Importer\Support\SourceResolverManager;
@@ -49,7 +50,7 @@ class AnalyzingState extends AbstractState implements ImportStateContract
     {
         $record = $this->getRecord();
 		if ($this->needsConfiguration()) {
-			throw new \Exception('Configuration is needed');
+			throw StateTransitionException::configurationRequired(static::class);
 		}
 
 	    $this->transitionToNextState($record);
