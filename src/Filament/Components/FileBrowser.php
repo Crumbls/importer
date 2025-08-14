@@ -40,13 +40,6 @@ class FileBrowser extends Field
 					$component->dirCache = [];
 				}
 				
-				// Log for debugging (remove in production)
-				\Log::info('FileBrowser State Updated', [
-					'disk_name' => $diskName,
-					'state' => $state,
-					'current_path' => $component->currentPath,
-					'state_type' => gettype($state),
-				]);
 			});
 	}
 
@@ -188,26 +181,9 @@ class FileBrowser extends Field
             $storage = Storage::disk($disk);
             $path = ltrim($path, '/');
             
-            // Debug: Check disk configuration and path
-            $diskConfig = config("filesystems.disks.{$disk}");
-            \Log::info("FileBrowser Debug", [
-                'disk' => $disk,
-                'path' => $path,
-                'disk_config' => $diskConfig,
-                'disk_root' => $storage->path(''),
-                'looking_for_path' => $storage->path($path),
-            ]);
-            
             // Get raw directories and files first
             $rawDirectories = $storage->directories($path);
             $rawFiles = $storage->files($path);
-            
-            \Log::info("FileBrowser Raw Results", [
-                'raw_directories' => $rawDirectories,
-                'raw_files' => $rawFiles,
-                'directory_count' => count($rawDirectories),
-                'file_count' => count($rawFiles),
-            ]);
             
             $directories = collect($rawDirectories)
                 ->map(fn($dir) => [
@@ -230,13 +206,6 @@ class FileBrowser extends Field
                     'extension' => pathinfo($file, PATHINFO_EXTENSION),
                 ])
                 ->toArray();
-                
-            \Log::info("FileBrowser Filtered Results", [
-                'allowed_extensions' => $this->allowedExtensions,
-                'filtered_files' => array_column($files, 'name'),
-                'final_directory_count' => count($directories),
-                'final_file_count' => count($files),
-            ]);
 
             return [
                 'current_path' => $path,
@@ -245,12 +214,6 @@ class FileBrowser extends Field
                 'files' => $files,
             ];
         } catch (\Exception $e) {
-            \Log::error("FileBrowser Error", [
-                'disk' => $disk,
-                'path' => $path,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
             throw $e;
         }
     }

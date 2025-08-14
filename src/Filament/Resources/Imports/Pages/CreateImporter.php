@@ -37,7 +37,7 @@ class CreateImporter extends CreateRecord
                 $disk = Arr::get($data, 'storage_disk', 'local');
                 $data['source_detail'] = $disk . ':' . $temp;
             } else {
-                dd(__LINE__);
+                throw new \InvalidArgumentException('No valid source detail provided for import creation');
             }
         }
 
