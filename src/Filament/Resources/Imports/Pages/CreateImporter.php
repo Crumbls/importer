@@ -41,6 +41,7 @@ class CreateImporter extends CreateRecord
             }
         }
 
+
         unset($data['source_detail_file'], $data['source_detail_database'], $data['storage_disk'], $data['selected_file_path']);
 
         return $data;
